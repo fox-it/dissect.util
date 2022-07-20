@@ -1,0 +1,74 @@
+# Reference: [MS-XCA]
+import io
+import struct
+
+
+def decompress(src):
+    """LZXPRESS decompress from a file-like object.
+
+    Args:
+        src: File-like object to decompress from.
+
+    Returns:
+        bytes: The decompressed bytes.
+    """
+    if not hasattr(src, "read"):
+        src = io.BytesIO(src)
+
+    offset = src.tell()
+    src.seek(0, io.SEEK_END)
+    size = src.tell() - offset
+    src.seek(offset)
+
+    dst = bytearray()
+
+    buffered_flags = 0
+    buffered_flags_count = 0
+    last_length_half_byte = 0
+
+    while src.tell() - offset < size:
+        if buffered_flags_count == 0:
+            buffered_flags = struct.unpack("<I", src.read(4))[0]
+            buffered_flags_count = 32
+
+        buffered_flags_count -= 1
+        if buffered_flags & (1 << buffered_flags_count) == 0:
+            dst.append(ord(src.read(1)))
+        else:
+            if src.tell() - offset == size:
+                break
+
+            match = struct.unpack("<H", src.read(2))[0]
+            match_offset, match_length = divmod(match, 8)
+            match_offset += 1
+
+            if match_length == 7:
+                if last_length_half_byte == 0:
+                    last_length_half_byte = src.tell()
+                    match_length = ord(src.read(1)) % 16
+                else:
+                    rewind = src.tell()
+                    src.seek(last_length_half_byte)
+                    match_length = ord(src.read(1)) // 16
+                    src.seek(rewind)
+                    last_length_half_byte = 0
+
+                if match_length == 15:
+                    match_length = ord(src.read(1))
+                    if match_length == 255:
+                        match_length = struct.unpack("<H", src.read(2))[0]
+                        if match_length == 0:
+                            match_length = struct.unpack("<I", src.read(4))[0]
+
+                        if match_length < 15 + 7:
+                            raise Exception("wrong match length")
+
+                        match_length -= 15 + 7
+                    match_length += 15
+                match_length += 7
+            match_length += 3
+
+            for _ in range(match_length):
+                dst.append(dst[-match_offset])
+
+    return bytes(dst)
