@@ -4,7 +4,7 @@ from platform import system
 from typing import Dict
 
 
-if system().lower() == "windows":
+if system().lower() in ("windows", "emscripten"):
     _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
     def _calculate_timestamp(ts: float) -> datetime:

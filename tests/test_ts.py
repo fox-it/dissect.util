@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 
-@pytest.fixture(params=["windows", "linux"])
+@pytest.fixture(params=["windows", "emscripten", "linux"])
 def imported_ts(request):
     with patch.object(platform, "system", return_value=request.param):
         from dissect.util import ts
