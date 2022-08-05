@@ -10,9 +10,9 @@ if system().lower() in ("windows", "emscripten"):
     def _calculate_timestamp(ts: float) -> datetime:
         """Calculate timestamps relative from Unix epoch.
 
-        Python on Windows has problems calculating timestamps before 1970 (Unix epoch).
+        Python on Windows and WASM (Emscripten) have problems calculating timestamps before 1970 (Unix epoch).
         Calculating relatively from the epoch is required to correctly calculate those timestamps.
-        This method is slower, so we split the implementation between Windows and other platforms.
+        This method is slower, so we split the implementation between Windows, WASM and other platforms.
         """
         return _EPOCH + timedelta(seconds=ts)
 
