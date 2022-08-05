@@ -226,6 +226,7 @@ UUID v1 timestamps have an epoch of 1582-10-15 00:00:00.
 
     Args:
         ts: The UUID version 1 timestamp
+
     Returns:
         Datetime object from the passed timestamp.
     """
