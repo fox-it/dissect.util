@@ -222,7 +222,8 @@ def cocoatimestamp(ts: int) -> datetime:
 
 def uuid1timestamp(ts: int) -> datetime:
     """Converts UUID version 1 timestamps to aware datetime objects in UTC.
-UUID v1 timestamps have an epoch of 1582-10-15 00:00:00.
+
+    UUID v1 timestamps have an epoch of 1582-10-15 00:00:00.
 
     Args:
         ts: The UUID version 1 timestamp
