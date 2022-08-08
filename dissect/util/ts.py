@@ -220,6 +220,20 @@ def cocoatimestamp(ts: int) -> datetime:
     return _calculate_timestamp(float(ts) + 978307200)
 
 
+def uuid1timestamp(ts: int) -> datetime:
+    """Converts UUID version 1 timestamps to aware datetime objects in UTC.
+
+    UUID v1 timestamps have an epoch of 1582-10-15 00:00:00.
+
+    Args:
+        ts: The UUID version 1 timestamp
+
+    Returns:
+        Datetime object from the passed timestamp.
+    """
+    return _calculate_timestamp(float(ts) * 1e-7 - 12219292800)
+
+
 def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime:
     """Converts MS-DOS timestamps to naive datetime objects.
 
