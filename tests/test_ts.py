@@ -114,6 +114,7 @@ def test_oatimestamp(imported_ts):
     dt = datetime(2016, 10, 17, 4, 6, 38, 362003, tzinfo=timezone.utc)
     assert imported_ts.oatimestamp(42660.171277338) == dt
     assert imported_ts.oatimestamp(4676095982878497960) == dt
+    assert imported_ts.oatimestamp(-4542644417712532139) == datetime(1661, 4, 17, 11, 30, tzinfo=timezone.utc)
 
 
 def test_webkittimestamp(imported_ts):
