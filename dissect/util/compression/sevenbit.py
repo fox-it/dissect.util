@@ -1,7 +1,8 @@
 from io import BytesIO
+from typing import BinaryIO, Union
 
 
-def compress(src):
+def compress(src: Union[bytes, BinaryIO]) -> bytes:
     if not hasattr(src, "read"):
         src = BytesIO(src)
 
@@ -28,7 +29,7 @@ def compress(src):
     return bytes(dst)
 
 
-def decompress(src, wide=False):
+def decompress(src: Union[bytes, BinaryIO], wide: bool = False) -> bytes:
     if not hasattr(src, "read"):
         src = BytesIO(src)
 
