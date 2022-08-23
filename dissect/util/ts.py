@@ -192,7 +192,7 @@ def oatimestamp(ts: float) -> datetime:
     """
     if not isinstance(ts, float):
         # Convert from int to float
-        (ts,) = struct.unpack("<d", struct.pack("<Q", ts))
+        (ts,) = struct.unpack("<d", struct.pack("<Q", ts & 0xFFFFFFFFFFFFFFFF))
     return _calculate_timestamp((ts - 25569) * 86400)
 
 
