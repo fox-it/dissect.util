@@ -6,6 +6,24 @@ from typing import Any, Iterator, Union
 
 
 def xmemoryview(view: bytes, format: str) -> Union[memoryview, _xmemoryview]:
+    """Cast a memoryview to the specified format, including endianness.
+
+    The regular ``memoryview.cast()`` method only supports host endianness. While that should be fine 99% of the time
+    (most of the world runs on little endian systems), we'd rather it be fine 100% of the time. This utility method
+    ensures that by transparently converting between endianness if it doesn't match the host endianness.
+
+    If the host endianness matches the requested endianness, this simply returns a regular ``memoryview.cast()``.
+
+    See ``memoryview.cast()`` for more details on what that actually does.
+
+    Args:
+        view: The bytes object or memoryview to cast.
+        format: The format to cast to in ``struct`` format syntax.
+
+    Raises:
+        ValueError: If the format is invalid.
+        TypeError: If the view is of an invalid type.
+    """
     if len(format) != 2:
         raise ValueError("Invalid format specification")
 
@@ -31,6 +49,13 @@ def xmemoryview(view: bytes, format: str) -> Union[memoryview, _xmemoryview]:
 
 
 class _xmemoryview:
+    """Wrapper for memoryview that converts between host and a different destination endianness.
+
+    Args:
+        view: The (already casted) memoryview to wrap.
+        format: The format to convert to.
+    """
+
     def __init__(self, view: memoryview, format: str):
         self._format = format
 
@@ -70,11 +95,8 @@ class _xmemoryview:
         return self._view.__eq__(other)
 
     def __iter__(self) -> Iterator[int]:
-        def it(xview):
-            for value in xview._view:
-                yield xview._convert(value)
-
-        return it(self)
+        for value in self._view:
+            yield self._convert(value)
 
     def __getattr__(self, attr: str) -> Any:
         return getattr(self._view, attr)
