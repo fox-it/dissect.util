@@ -3,6 +3,15 @@
 A Dissect module implementing various utility functions for the other Dissect modules. For more information, please see
 [the documentation](https://dissect.readthedocs.io/en/latest/projects/dissect.util).
 
+## Installation
+
+`dissect.util` is available on [PyPI](https://pypi.org/project/dissect.util/).
+
+```bash
+pip install dissect.util
+```
+
+This module is also automatically installed if you install the `dissect` package.
 
 ## Build and test instructions
 
