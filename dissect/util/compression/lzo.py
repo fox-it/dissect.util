@@ -25,7 +25,7 @@ def _copy_block(src: BinaryIO, dst: bytearray, length: int, distance: int, trail
         remaining -= len(add)
         block += add
 
-    dst.extend(block)
+    dst.extend(block[:length])
     dst.extend(src.read(trailing))
 
 
