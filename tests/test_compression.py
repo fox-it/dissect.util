@@ -1,4 +1,4 @@
-from dissect.util.compression import lz4, lznt1, lzxpress_huffman, lzxpress, sevenbit
+from dissect.util.compression import lz4, lznt1, lzo, lzxpress_huffman, lzxpress, sevenbit
 
 
 def test_lz4_decompress():
@@ -17,6 +17,13 @@ def test_lznt1_decompress():
         b"F# F# G A A G F# E D D E F# F# E E F# F# G A A "
         b"G F# E D D E F# E D D E E F# D E F# G F# D E F# "
         b"G F# E D E A F# F# G A A G F# E D D E F# E D D\x00"
+    )
+
+
+def test_lzo_decompress():
+    assert (
+        lzo.decompress(bytes.fromhex("0361626361626320f314000f616263616263616263616263616263616263110000"))
+        == b"abc" * 100
     )
 
 
