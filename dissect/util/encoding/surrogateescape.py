@@ -12,7 +12,7 @@ def error_handler(error):
             raise error
         result.append(chr(0xDC00 + byte))
 
-    return u"".join(result), error.end
+    return "".join(result), error.end
 
 
 try:
