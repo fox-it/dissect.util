@@ -29,11 +29,15 @@ def _copy_block(src: BinaryIO, dst: bytearray, length: int, distance: int, trail
     dst.extend(src.read(trailing))
 
 
-def decompress(src: Union[bytes, BinaryIO]) -> bytes:
+def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -1) -> bytes:
     """LZO decompress from a file-like object or bytes. Assumes no header.
+
+    Arguments are largely compatible with python-lzo API.
 
     Args:
         src: File-like object or bytes to decompress.
+        header: Whether the metadata header is included in the input.
+        buflen: If ``header`` is ``False``, a buffer length in bytes must be given that will fit the output.
 
     Returns:
         The decompressed data.
@@ -43,18 +47,23 @@ def decompress(src: Union[bytes, BinaryIO]) -> bytes:
 
     dst = bytearray()
 
-    first = True
+    if header:
+        byte = src.read(1)[0]
+        if byte < 0xF0 or byte > 0xF1:
+            raise ValueError("Invalid header value")
+        out_len = struct.unpack("<I", src.read(4))
+    else:
+        out_len = buflen
+
+    val = src.read(1)[0]
+    if val == 0x10:
+        raise ValueError("LZOv1")
+    elif val >= 0x12:
+        dst += src.read(val - 0x11)
+        val = src.read(1)[0]
+
     trailing = 0
     while True:
-        val = src.read(1)[0]
-        if first and val == 0x10:
-            raise ValueError("LZOv1")
-        elif first and val >= 0x12:
-            dst += src.read(val - 0x11)
-            first = False
-            continue
-        first = False
-
         if val <= 0xF:
             if not trailing:
                 if val == 0:
@@ -97,5 +106,10 @@ def decompress(src: Union[bytes, BinaryIO]) -> bytes:
             dist = (h << 3) + d + 1
             trailing = val & 3
             _copy_block(src, dst, length, dist, trailing)
+
+        if len(dst) == out_len:
+            break
+
+        val = src.read(1)[0]
 
     return bytes(dst)
