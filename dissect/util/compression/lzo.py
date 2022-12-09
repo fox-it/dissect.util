@@ -49,7 +49,7 @@ def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -
 
     if header:
         byte = src.read(1)[0]
-        if byte < 0xF0 or byte > 0xF1:
+        if byte not in [0xF0, 0xF1]:
             raise ValueError("Invalid header value")
         out_len = struct.unpack("<I", src.read(4))
     else:
