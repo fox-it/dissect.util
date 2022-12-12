@@ -1,9 +1,11 @@
+import io
 import struct
+from typing import BinaryIO, Union
 
 from dissect.util.exceptions import CorruptDataError
 
 
-def get_length(src, length):
+def _get_length(src: BinaryIO, length: int) -> int:
     if length != 0xF:
         return length
 
@@ -20,16 +22,23 @@ def get_length(src, length):
     return length
 
 
-def decompress(src, max_len):
-    """LZ4 decompress from a file-like object up to a certain length.
+def decompress(
+    src: Union[bytes, BinaryIO], max_length: int = -1, return_bytearray: bool = False, return_bytes_read: bool = False
+) -> Union[bytes, tuple[bytes, int]]:
+    """LZ4 decompress from a file-like object up to a certain length. Assumes no header.
 
     Args:
         src: File-like object to decompress from.
-        max_len: Decompress up to this many result bytes.
+        max_length: Decompress up to this many result bytes.
+        return_bytearray: Whether to return ``bytearray`` or ``bytes``.
+        return_bytes_read: Whether to return a tuple of ``(data, bytes_read)`` or just the data.
 
     Returns:
-        A tuple of the decompressed bytearray and the amount of bytes read.
+        The decompressed data or a tuple of the decompressed data and the amount of bytes read.
     """
+    if not hasattr(src, "read"):
+        src = io.BytesIO(src)
+
     dst = bytearray()
     start = src.tell()
     min_match_len = 4
@@ -40,7 +49,7 @@ def decompress(src, max_len):
             raise CorruptDataError("EOF at reading literal-len")
 
         token = ord(read_buf)
-        literal_len = get_length(src, (token >> 4) & 0xF)
+        literal_len = _get_length(src, (token >> 4) & 0xF)
 
         read_buf = src.read(literal_len)
 
@@ -48,7 +57,7 @@ def decompress(src, max_len):
             raise CorruptDataError("Not literal data")
         dst.extend(read_buf)
 
-        if len(dst) == max_len:
+        if len(dst) == max_length:
             break
 
         read_buf = src.read(2)
@@ -66,10 +75,16 @@ def decompress(src, max_len):
         if offset == 0:
             raise CorruptDataError("Offset can't be 0")
 
-        match_len = get_length(src, (token >> 0) & 0xF)
+        match_len = _get_length(src, (token >> 0) & 0xF)
         match_len += min_match_len
 
         for _ in range(match_len):
             dst.append(dst[-offset])
 
-    return dst, src.tell() - start
+    if not return_bytearray:
+        dst = bytes(dst)
+
+    if return_bytes_read:
+        return dst, src.tell() - start
+    else:
+        return dst

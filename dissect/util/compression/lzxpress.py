@@ -1,16 +1,17 @@
 # Reference: [MS-XCA]
 import io
 import struct
+from typing import BinaryIO, Union
 
 
-def decompress(src):
-    """LZXPRESS decompress from a file-like object.
+def decompress(src: Union[bytes, BinaryIO]) -> bytes:
+    """LZXPRESS decompress from a file-like object or bytes.
 
     Args:
-        src: File-like object to decompress from.
+        src: File-like object or bytes to decompress.
 
     Returns:
-        bytes: The decompressed bytes.
+        The decompressed data.
     """
     if not hasattr(src, "read"):
         src = io.BytesIO(src)

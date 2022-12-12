@@ -3,6 +3,14 @@ from typing import BinaryIO, Union
 
 
 def compress(src: Union[bytes, BinaryIO]) -> bytes:
+    """Sevenbit compress from a file-like object or bytes.
+
+    Args:
+        src: File-like object or bytes to compress.
+
+    Returns:
+        The compressed data.
+    """
     if not hasattr(src, "read"):
         src = BytesIO(src)
 
@@ -30,6 +38,14 @@ def compress(src: Union[bytes, BinaryIO]) -> bytes:
 
 
 def decompress(src: Union[bytes, BinaryIO], wide: bool = False) -> bytes:
+    """Sevenbit decompress from a file-like object or bytes.
+
+    Args:
+        src: File-like object or bytes to decompress.
+
+    Returns:
+        The decompressed data.
+    """
     if not hasattr(src, "read"):
         src = BytesIO(src)
 
