@@ -59,75 +59,87 @@ class CpioInfo(tarfile.TarInfo):
     @classmethod
     def frombuf(cls, buf: bytes, format: int, encoding: str, errors: str) -> tarfile.TarInfo:
         if format in (FORMAT_CPIO_BIN, FORMAT_CPIO_ODC, FORMAT_CPIO_HPBIN, FORMAT_CPIO_HPODC):
-            if format in (FORMAT_CPIO_BIN, FORMAT_CPIO_HPBIN):
-                values = list(struct.unpack("<13H", buf))
-                if values[0] == _swap16(CPIO_MAGIC_OLD):
-                    values = [_swap16(v) for v in values]
-
-                mtime = (values.pop(8) << 16) | values.pop(8)
-                size = (values.pop(9) << 16) | values.pop(9)
-                values.insert(8, mtime)
-                values.append(size)
-            else:
-                values = [int(v, 8) for v in struct.unpack("<6s6s6s6s6s6s6s6s11s6s11s", buf)]
-
-            if values[0] != CPIO_MAGIC_OLD:
-                raise InvalidHeaderError(f"Invalid (old) ASCII/binary cpio header magic: {oct(values[0])}")
-
-            obj = cls()
-            obj.devmajor = values[1] >> 8
-            obj.devminor = values[1] & 0xFF
-            obj._mode = values[3]
-            obj.uid = values[4]
-            obj.gid = values[5]
-            obj.mtime = values[8]
-            obj.size = values[10]
-
-            # Extra fields
-            obj.magic = values[0]
-            obj.ino = values[2]
-            obj.nlink = values[6]
-            obj.rdevmajor = values[7] >> 8
-            obj.rdevminor = values[7] & 0xFF
-            obj.namesize = values[9]
-
-            if (
-                stat.S_IFMT(obj.mode) in (stat.S_IFCHR, stat.S_IFBLK, stat.S_IFSOCK, stat.S_IFIFO)
-                and obj.size != 0
-                and obj.rdevmajor == 0
-                and obj.rdevminor == 1
-            ):
-                obj.rdevmajor = (obj.size >> 8) & 0xFF
-                obj.rdevminor = obj.size & 0xFF
-                obj.size = 0
+            obj = cls._old_frombuf(buf, format)
         elif format in (FORMAT_CPIO_NEWC, FORMAT_CPIO_CRC):
-            values = struct.unpack("<6s8s8s8s8s8s8s8s8s8s8s8s8s8s", buf)
-            values = [int(values[0], 8)] + [int(v, 16) for v in values[1:]]
-            if values[0] not in (CPIO_MAGIC_NEW, CPIO_MAGIC_CRC):
-                raise InvalidHeaderError(f"Invalid (new) ASCII cpio header magic: {oct(values[0])}")
-
-            obj = cls()
-            obj._mode = values[2]
-            obj.uid = values[3]
-            obj.gid = values[4]
-            obj.mtime = values[6]
-            obj.size = values[7]
-            obj.devmajor = values[8]
-            obj.devminor = values[9]
-            obj.chksum = values[13]
-
-            # Extra fields
-            obj.magic = values[0]
-            obj.ino = values[1]
-            obj.nlink = values[5]
-            obj.rdevmajor = values[10]
-            obj.rdevminor = values[11]
-            obj.namesize = values[12]
+            obj = cls._new_frombuf(buf, format)
 
         # Common postprocessing
         ftype = stat.S_IFMT(obj._mode)
         obj.type = TYPE_MAP.get(ftype, ftype)
         obj.mode = stat.S_IMODE(obj._mode)
+
+        return obj
+
+    @classmethod
+    def _old_frombuf(cls, buf: bytes, format: int):
+        if format in (FORMAT_CPIO_BIN, FORMAT_CPIO_HPBIN):
+            values = list(struct.unpack("<13H", buf))
+            if values[0] == _swap16(CPIO_MAGIC_OLD):
+                values = [_swap16(v) for v in values]
+
+            mtime = (values.pop(8) << 16) | values.pop(8)
+            size = (values.pop(9) << 16) | values.pop(9)
+            values.insert(8, mtime)
+            values.append(size)
+        else:
+            values = [int(v, 8) for v in struct.unpack("<6s6s6s6s6s6s6s6s11s6s11s", buf)]
+
+        if values[0] != CPIO_MAGIC_OLD:
+            raise InvalidHeaderError(f"Invalid (old) ASCII/binary cpio header magic: {oct(values[0])}")
+
+        obj = cls()
+        obj.devmajor = values[1] >> 8
+        obj.devminor = values[1] & 0xFF
+        obj._mode = values[3]
+        obj.uid = values[4]
+        obj.gid = values[5]
+        obj.mtime = values[8]
+        obj.size = values[10]
+
+        # Extra fields
+        obj.magic = values[0]
+        obj.ino = values[2]
+        obj.nlink = values[6]
+        obj.rdevmajor = values[7] >> 8
+        obj.rdevminor = values[7] & 0xFF
+        obj.namesize = values[9]
+
+        if (
+            stat.S_IFMT(obj.mode) in (stat.S_IFCHR, stat.S_IFBLK, stat.S_IFSOCK, stat.S_IFIFO)
+            and obj.size != 0
+            and obj.rdevmajor == 0
+            and obj.rdevminor == 1
+        ):
+            obj.rdevmajor = (obj.size >> 8) & 0xFF
+            obj.rdevminor = obj.size & 0xFF
+            obj.size = 0
+
+        return obj
+
+    @classmethod
+    def _new_frombuf(cls, buf: bytes, format: int):
+        values = struct.unpack("<6s8s8s8s8s8s8s8s8s8s8s8s8s8s", buf)
+        values = [int(values[0], 8)] + [int(v, 16) for v in values[1:]]
+        if values[0] not in (CPIO_MAGIC_NEW, CPIO_MAGIC_CRC):
+            raise InvalidHeaderError(f"Invalid (new) ASCII cpio header magic: {oct(values[0])}")
+
+        obj = cls()
+        obj._mode = values[2]
+        obj.uid = values[3]
+        obj.gid = values[4]
+        obj.mtime = values[6]
+        obj.size = values[7]
+        obj.devmajor = values[8]
+        obj.devminor = values[9]
+        obj.chksum = values[13]
+
+        # Extra fields
+        obj.magic = values[0]
+        obj.ino = values[1]
+        obj.nlink = values[5]
+        obj.rdevmajor = values[10]
+        obj.rdevminor = values[11]
+        obj.namesize = values[12]
 
         return obj
 
