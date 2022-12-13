@@ -12,6 +12,10 @@ FORMAT_CPIO_HPBIN = 16
 FORMAT_CPIO_HPODC = 17
 FORMAT_CPIO_UNKNOWN = 18
 
+CPIO_MAGIC_OLD = 0o070707
+CPIO_MAGIC_NEW = 0o070701
+CPIO_MAGIC_CRC = 0o070702
+
 TYPE_MAP = {
     stat.S_IFREG: tarfile.REGTYPE,
     stat.S_IFDIR: tarfile.DIRTYPE,
@@ -57,7 +61,7 @@ class CpioInfo(tarfile.TarInfo):
         if format in (FORMAT_CPIO_BIN, FORMAT_CPIO_ODC, FORMAT_CPIO_HPBIN, FORMAT_CPIO_HPODC):
             if format in (FORMAT_CPIO_BIN, FORMAT_CPIO_HPBIN):
                 values = list(struct.unpack("<13H", buf))
-                if values[0] == _swap16(0o070707):
+                if values[0] == _swap16(CPIO_MAGIC_OLD):
                     values = [_swap16(v) for v in values]
 
                 mtime = (values.pop(8) << 16) | values.pop(8)
@@ -67,7 +71,7 @@ class CpioInfo(tarfile.TarInfo):
             else:
                 values = [int(v, 8) for v in struct.unpack("<6s6s6s6s6s6s6s6s11s6s11s", buf)]
 
-            if values[0] != 0o070707:
+            if values[0] != CPIO_MAGIC_OLD:
                 raise InvalidHeaderError(f"Invalid (old) ASCII/binary cpio header magic: {oct(values[0])}")
 
             obj = cls()
@@ -99,7 +103,7 @@ class CpioInfo(tarfile.TarInfo):
         elif format in (FORMAT_CPIO_NEWC, FORMAT_CPIO_CRC):
             values = struct.unpack("<6s8s8s8s8s8s8s8s8s8s8s8s8s8s", buf)
             values = [int(values[0], 8)] + [int(v, 16) for v in values[1:]]
-            if values[0] not in (0o070701, 0o070702):
+            if values[0] not in (CPIO_MAGIC_NEW, CPIO_MAGIC_CRC):
                 raise InvalidHeaderError(f"Invalid (new) ASCII cpio header magic: {oct(values[0])}")
 
             obj = cls()
@@ -130,6 +134,7 @@ class CpioInfo(tarfile.TarInfo):
     def _proc_member(self, tarfile: tarfile.TarFile) -> tarfile.TarInfo:
         self.name = tarfile.fileobj.read(self.namesize - 1).decode(tarfile.encoding, tarfile.errors)
         if self.name == "TRAILER!!!":
+            # The last entry in a cpio file has the special name ``TRAILER!!!``, indicating the end of the archive
             return None
 
         offset = tarfile.fileobj.tell() + 1
