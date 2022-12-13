@@ -4,25 +4,26 @@
 import io
 import struct
 from collections import namedtuple
+from typing import BinaryIO, Optional, Union
 
 
 Symbol = namedtuple("Symbol", ["length", "symbol"])
 
 
-def read_16_bit(fh):
+def _read_16_bit(fh: BinaryIO) -> int:
     return struct.unpack("<H", fh.read(2).rjust(2, b"\x00"))[0]
 
 
 class Node:
     __slots__ = ("symbol", "is_leaf", "children")
 
-    def __init__(self, symbol=None, is_leaf=False):
+    def __init__(self, symbol: Optional[Symbol] = None, is_leaf: bool = False):
         self.symbol = symbol
         self.is_leaf = is_leaf
         self.children = [None, None]
 
 
-def add_leaf(nodes, idx, mask, bits):
+def _add_leaf(nodes: list[Node], idx: int, mask: int, bits: int) -> int:
     node = nodes[0]
     i = idx + 1
 
@@ -39,12 +40,12 @@ def add_leaf(nodes, idx, mask, bits):
     return i
 
 
-def build_tree(buf):
+def _build_tree(buf: bytes) -> Node:
     if len(buf) != 256:
         raise ValueError("Not enough data for Huffman code tree")
 
     nodes = [Node() for _ in range(1024)]
-    symbols = []
+    symbols: list[Symbol] = []
 
     for i, c in enumerate(buf):
         symbols.append(Symbol(c & 0x0F, i * 2))
@@ -74,7 +75,7 @@ def build_tree(buf):
         mask = (mask << s.length - bits) & 0xFFFFFFFF
         bits = s.length
 
-        tree_index = add_leaf(nodes, tree_index, mask, bits)
+        tree_index = _add_leaf(nodes, tree_index, mask, bits)
         mask += 1
 
     return root
@@ -87,31 +88,31 @@ class BitString:
         self.bits = 0
 
     @property
-    def index(self):
+    def index(self) -> int:
         return self.source.tell()
 
-    def init(self, fh):
-        self.mask = (read_16_bit(fh) << 16) + read_16_bit(fh)
+    def init(self, fh: BinaryIO) -> None:
+        self.mask = (_read_16_bit(fh) << 16) + _read_16_bit(fh)
         self.bits = 32
         self.source = fh
 
-    def read(self, n):
+    def read(self, n: int) -> bytes:
         return self.source.read(n)
 
-    def lookup(self, n):
+    def lookup(self, n: int) -> int:
         if n == 0:
             return 0
 
         return self.mask >> (32 - n)
 
-    def skip(self, n):
+    def skip(self, n: int) -> None:
         self.mask = (self.mask << n) & 0xFFFFFFFF
         self.bits -= n
         if self.bits < 16:
-            self.mask += read_16_bit(self.source) << (16 - self.bits)
+            self.mask += _read_16_bit(self.source) << (16 - self.bits)
             self.bits += 16
 
-    def decode(self, root):
+    def decode(self, root: Node) -> Symbol:
         node = root
         while not node.is_leaf:
             bit = self.lookup(1)
@@ -120,17 +121,20 @@ class BitString:
         return node.symbol
 
 
-def decompress(src):
-    """LZXPRESS decompress from a file-like object.
+def decompress(src: Union[bytes, BinaryIO]) -> bytes:
+    """LZXPRESS decompress from a file-like object or bytes.
 
-    Decompresses until EOF of the input file-like object.
+    Decompresses until EOF of the input data.
 
     Args:
-        src: File-like object to decompress from.
+        src: File-like object or bytes to decompress.
 
     Returns:
-        bytearray: The decompressed bytes.
+        The decompressed data.
     """
+    if not hasattr(src, "read"):
+        src = io.BytesIO(src)
+
     dst = bytearray()
 
     start_offset = src.tell()
@@ -141,7 +145,7 @@ def decompress(src):
     bitstring = BitString()
 
     while src.tell() - start_offset < size:
-        root = build_tree(src.read(256))
+        root = _build_tree(src.read(256))
         bitstring.init(src)
 
         chunk_size = 0
@@ -161,7 +165,7 @@ def decompress(src):
                     length = ord(bitstring.read(1)) + 15
 
                     if length == 270:
-                        length = read_16_bit(bitstring.source)
+                        length = _read_16_bit(bitstring.source)
 
                 bitstring.skip(symbol)
 
@@ -170,4 +174,4 @@ def decompress(src):
                     dst.append(dst[-offset])
                 chunk_size += length
 
-    return io.BytesIO(bytes(dst))
+    return bytes(dst)

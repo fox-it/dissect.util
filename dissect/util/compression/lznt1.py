@@ -2,9 +2,10 @@
 import io
 import struct
 import array
+from typing import BinaryIO, Union
 
 
-def get_displacement(offset):
+def _get_displacement(offset: int) -> int:
     """Calculate the displacement."""
     result = 0
     while offset >= 0x10:
@@ -14,7 +15,7 @@ def get_displacement(offset):
     return result
 
 
-DISPLACEMENT_TABLE = array.array("B", [get_displacement(x) for x in range(8192)])
+DISPLACEMENT_TABLE = array.array("B", [_get_displacement(x) for x in range(8192)])
 
 COMPRESSED_MASK = 1 << 15
 SIGNATURE_MASK = 3 << 12
@@ -22,15 +23,18 @@ SIZE_MASK = (1 << 12) - 1
 TAG_MASKS = [(1 << i) for i in range(0, 8)]
 
 
-def decompress(src):
-    """LZNT1 decompress from a file-like object.
+def decompress(src: Union[bytes, BinaryIO]) -> bytes:
+    """LZNT1 decompress from a file-like object or bytes.
 
     Args:
-        src: File-like object to decompress from.
+        src: File-like object or bytes to decompress.
 
     Returns:
-        bytes: The decompressed bytes.
+        The decompressed data.
     """
+    if not hasattr(src, "read"):
+        src = io.BytesIO(src)
+
     offset = src.tell()
     src.seek(0, io.SEEK_END)
     size = src.tell() - offset
