@@ -104,6 +104,13 @@ class CpioInfo(tarfile.TarInfo):
         obj.rdevminor = values[7] & 0xFF
         obj.namesize = values[9]
 
+        # This is a specific case for HP/UX cpio archives, which I'll let this comment from the original source explain:
+        # HP/UX cpio creates archives that look just like ordinary archives,
+        # but for devices it sets major = 0, minor = 1, and puts the
+        # actual major/minor number in the filesize field.  See if this
+        # is an HP/UX cpio archive, and if so fix it.  We have to do this
+        # here because process_copy_in() assumes filesize is always 0
+        # for devices.
         if (
             stat.S_IFMT(obj.mode) in (stat.S_IFCHR, stat.S_IFBLK, stat.S_IFSOCK, stat.S_IFIFO)
             and obj.size != 0
