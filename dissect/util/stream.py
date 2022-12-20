@@ -443,7 +443,6 @@ class OverlayStream(AlignedStream):
         self._fh = fh
         self.overlays: dict[int, tuple[int, BinaryIO]] = {}
         self._lookup: list[int] = []
-        self.debug = False
 
     def add(self, offset: int, data: Union[bytes, BinaryIO], size: Optional[int] = None) -> None:
         """Add an overlay at the given offset.
