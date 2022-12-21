@@ -455,10 +455,8 @@ class OverlayStream(AlignedStream):
         if not hasattr(data, "read"):
             size = size or len(data)
             data = io.BytesIO(data)
-        elif size is None and hasattr(data, "size"):
-            size = data.size
-        else:
-            size = data.seek(0, io.SEEK_END)
+        elif size is None:
+            size = data.size if hasattr(data, "size") else data.seek(0, io.SEEK_END)
 
         if not size:
             return
