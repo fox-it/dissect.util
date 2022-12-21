@@ -162,3 +162,7 @@ def test_overlay_stream():
 
     with pytest.raises(ValueError):
         fh.add(500, b"\x03" * 100)
+
+    fh.add((512 * 8) - 4, b"\x04" * 100)
+    fh.seek((512 * 8) - 4)
+    assert fh.read(100) == b"\x04" * 4

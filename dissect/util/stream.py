@@ -460,6 +460,12 @@ class OverlayStream(AlignedStream):
         else:
             size = data.seek(0, io.SEEK_END)
 
+        if not size:
+            return
+
+        if size < 0:
+            raise ValueError("Size must be positive")
+
         # Check if there are overlapping overlays
         for other_offset, (other_size, _) in self.overlays.items():
             if other_offset < offset + size and offset < other_offset + other_size:
@@ -472,6 +478,8 @@ class OverlayStream(AlignedStream):
         # Clear the buffer if we add an overlay at our current position
         if self._buf and (self._pos_align <= offset + size and offset <= self._pos_align + len(self._buf)):
             self._buf = None
+
+        return self
 
     def _read(self, offset: int, length: int) -> bytes:
         result = []
