@@ -1,7 +1,7 @@
 import io
 import os
-from bisect import bisect_right
-from typing import BinaryIO, List, Optional, Tuple
+from bisect import bisect_left, bisect_right
+from typing import BinaryIO, Optional, Union
 
 STREAM_BUFFER_SIZE = int(os.getenv("DISSECT_STREAM_BUFFER_SIZE", io.DEFAULT_BUFFER_SIZE))
 
@@ -190,10 +190,11 @@ class RangeStream(AlignedStream):
         fh: The source file-like object.
         offset: The offset the stream should start from on the source file-like object.
         size: The size the stream should be.
+        align: The alignment size.
     """
 
-    def __init__(self, fh: BinaryIO, offset: int, size: Optional[int]):
-        super().__init__(size)
+    def __init__(self, fh: BinaryIO, offset: int, size: int, align: int = STREAM_BUFFER_SIZE):
+        super().__init__(size, align)
         self._fh = fh
         self.offset = offset
 
@@ -216,10 +217,12 @@ class RelativeStream(AlignedStream):
     Args:
         fh: The source file-like object.
         offset: The offset the stream should start from on the source file-like object.
+        size: The size the stream should be.
+        align: The alignment size.
     """
 
-    def __init__(self, fh: BinaryIO, offset: int, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, fh: BinaryIO, offset: int, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+        super().__init__(size, align)
         self._fh = fh
         self.offset = offset
 
@@ -246,18 +249,24 @@ class BufferedStream(RelativeStream):
         fh: The source file-like object.
         offset: The offset the stream should start from.
         size: The size the stream should be.
+        align: The alignment size.
     """
 
-    def __init__(self, fh: BinaryIO, offset: int = 0, **kwargs):
-        super().__init__(fh, offset, **kwargs)
+    def __init__(self, fh: BinaryIO, offset: int = 0, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+        super().__init__(fh, offset, size, align)
 
 
 class MappingStream(AlignedStream):
-    """Create a stream from multiple mapped file-like objects."""
+    """Create a stream from multiple mapped file-like objects.
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._runs: List[Tuple[int, int, BinaryIO, int]] = []
+    Args:
+        size: The size the stream should be.
+        align: The alignment size.
+    """
+
+    def __init__(self, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+        super().__init__(size, align)
+        self._runs: list[tuple[int, int, BinaryIO, int]] = []
 
     def add(self, offset: int, size: int, fh: BinaryIO, file_offset: int = 0) -> None:
         """Add a file-like object to the stream.
@@ -273,7 +282,7 @@ class MappingStream(AlignedStream):
         self._buf = None
         self.size = self._runs[-1][0] + self._runs[-1][1]
 
-    def _get_run_idx(self, offset: int) -> Tuple[int, int, BinaryIO, int]:
+    def _get_run_idx(self, offset: int) -> tuple[int, int, BinaryIO, int]:
         """Find a mapping run for a given offset.
 
         Args:
@@ -342,7 +351,7 @@ class RunlistStream(AlignedStream):
         block_size: The block size in bytes.
     """
 
-    def __init__(self, fh: BinaryIO, runlist: List[Tuple[int, int]], size: int, block_size: int):
+    def __init__(self, fh: BinaryIO, runlist: list[tuple[int, int]], size: int, block_size: int):
         super().__init__(size, block_size)
 
         if isinstance(fh, RunlistStream):
@@ -357,11 +366,11 @@ class RunlistStream(AlignedStream):
         self.block_size = block_size
 
     @property
-    def runlist(self) -> List[Tuple[int, int]]:
+    def runlist(self) -> list[tuple[int, int]]:
         return self._runlist
 
     @runlist.setter
-    def runlist(self, runlist: List[Tuple[int, int]]) -> None:
+    def runlist(self, runlist: list[tuple[int, int]]) -> None:
         self._runlist = runlist
         self._runlist_offsets = []
 
@@ -415,3 +424,121 @@ class RunlistStream(AlignedStream):
             run_idx += 1
 
         return b"".join(r)
+
+
+class OverlayStream(AlignedStream):
+    """Create a stream from another file-like object with the ability to overlay other streams or bytes.
+
+    Useful for patching large file-like objects without having to cache the entire contents.
+    First wrap the original stream in this class, and then call ``add()`` with the offset and data to overlay.
+
+    Args:
+        fh: The source file-like object.
+        size: The size the stream should be.
+        align: The alignment size.
+    """
+
+    def __init__(self, fh: BinaryIO, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+        super().__init__(size, align)
+        self._fh = fh
+        self.overlays: dict[int, tuple[int, BinaryIO]] = {}
+        self._lookup: list[int] = []
+
+    def add(self, offset: int, data: Union[bytes, BinaryIO], size: Optional[int] = None) -> None:
+        """Add an overlay at the given offset.
+
+        Args:
+            offset: The offset in bytes to add an overlay at.
+            data: The bytes or file-like object to overlay
+            size: Optional size specification of the overlay, if it can't be inferred.
+        """
+        if not hasattr(data, "read"):
+            size = size or len(data)
+            data = io.BytesIO(data)
+        elif size is None:
+            size = data.size if hasattr(data, "size") else data.seek(0, io.SEEK_END)
+
+        if not size:
+            return
+
+        if size < 0:
+            raise ValueError("Size must be positive")
+
+        # Check if there are overlapping overlays
+        for other_offset, (other_size, _) in self.overlays.items():
+            if other_offset < offset + size and offset < other_offset + other_size:
+                raise ValueError(f"Overlap with existing overlay: ({other_offset, other_size})")
+
+        self.overlays[offset] = (size, data)
+        self._lookup.append(offset)
+        self._lookup.sort()
+
+        # Clear the buffer if we add an overlay at our current position
+        if self._buf and (self._pos_align <= offset + size and offset <= self._pos_align + len(self._buf)):
+            self._buf = None
+
+        return self
+
+    def _read(self, offset: int, length: int) -> bytes:
+        result = []
+
+        fh = self._fh
+        overlays = self.overlays
+        lookup = self._lookup
+
+        overlay_len = len(overlays)
+        overlay_idx = bisect_left(lookup, offset)
+
+        while length > 0:
+            prev_overlay_offset = None if overlay_idx == 0 else lookup[overlay_idx - 1]
+            next_overlay_offset = None if overlay_idx >= overlay_len else lookup[overlay_idx]
+
+            if prev_overlay_offset is not None:
+                prev_overlay_size, prev_overlay_data = overlays[prev_overlay_offset]
+                prev_overlay_end = prev_overlay_offset + prev_overlay_size
+
+                if prev_overlay_end > offset:
+                    # Currently in an overlay
+                    offset_in_prev_overlay = offset - prev_overlay_offset
+                    prev_overlay_remaining = prev_overlay_size - offset_in_prev_overlay
+                    prev_overlay_read_size = min(length, prev_overlay_remaining)
+
+                    prev_overlay_data.seek(offset_in_prev_overlay)
+                    result.append(prev_overlay_data.read(prev_overlay_read_size))
+
+                    offset += prev_overlay_read_size
+                    length -= prev_overlay_read_size
+
+            if length == 0:
+                break
+
+            if next_overlay_offset:
+                next_overlay_size, next_overlay_data = overlays[next_overlay_offset]
+                gap_to_next_overlay = next_overlay_offset - offset
+
+                if 0 <= gap_to_next_overlay < length:
+                    if gap_to_next_overlay:
+                        fh.seek(offset)
+                        result.append(fh.read(gap_to_next_overlay))
+
+                    # read remaining from overlay
+                    next_overlay_read_size = min(next_overlay_size, length - gap_to_next_overlay)
+                    next_overlay_data.seek(0)
+                    result.append(next_overlay_data.read(next_overlay_read_size))
+
+                    offset += next_overlay_read_size + gap_to_next_overlay
+                    length -= next_overlay_read_size + gap_to_next_overlay
+                else:
+                    # Next overlay is too far away, complete read
+                    fh.seek(offset)
+                    result.append(fh.read(length))
+                    break
+            else:
+                # No next overlay, complete read
+                fh.seek(offset)
+                result.append(fh.read(length))
+                break
+
+            overlay_idx += 1
+
+        return b"".join(result)

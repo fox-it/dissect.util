@@ -1,4 +1,7 @@
 import io
+
+import pytest
+
 from dissect.util import stream
 
 
@@ -119,3 +122,47 @@ def test_aligned_stream_buffer():
     # Buffer should now be from the 3rd aligned block
     assert fh.read(256) == b"\x03" * 256
     assert fh._buf == b"\x03" * 512
+
+
+def test_overlay_stream():
+    buf = io.BytesIO(b"\x00" * 512 * 8)
+    fh = stream.OverlayStream(buf, size=512 * 8, align=512)
+
+    # Sanity check
+    assert fh.read() == b"\x00" * 512 * 8
+    fh.seek(0)
+
+    # Add a small overlay
+    fh.add(512, b"\xFF" * 4)
+
+    assert fh.read(512) == b"\x00" * 512
+    assert fh.read(512) == (b"\xFF" * 4) + (b"\x00" * 508)
+
+    fh.seek(510)
+    assert fh.read(4) == b"\x00\x00\xFF\xFF"
+
+    # Add a large unaligned overlay
+    fh.add(1000, b"\x01" * 1024)
+
+    fh.seek(1000)
+    assert fh.read(1024) == b"\x01" * 1024
+    fh.seek(1024)
+    assert fh.read(512) == b"\x01" * 512
+    fh.seek(2000)
+    assert fh.read(512) == (b"\x01" * 24) + (b"\x00" * 488)
+
+    fh.seek(2048)
+    assert fh.read(512) == b"\x00" * 512
+
+    # Add a consecutive overlay
+    fh.add(516, b"\x02" * 10)
+
+    fh.seek(510)
+    assert fh.read(32) == b"\x00\x00" + (b"\xFF" * 4) + (b"\x02" * 10) + (b"\x00" * 16)
+
+    with pytest.raises(ValueError):
+        fh.add(500, b"\x03" * 100)
+
+    fh.add((512 * 8) - 4, b"\x04" * 100)
+    fh.seek((512 * 8) - 4)
+    assert fh.read(100) == b"\x04" * 4
