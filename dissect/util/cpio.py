@@ -39,7 +39,14 @@ class CpioInfo(tarfile.TarInfo):
 
     @classmethod
     def fromtarfile(cls, tarfile: tarfile.TarFile) -> tarfile.TarInfo:
-        if tarfile.format == FORMAT_CPIO_UNKNOWN:
+        if tarfile.format not in (
+            FORMAT_CPIO_BIN,
+            FORMAT_CPIO_ODC,
+            FORMAT_CPIO_NEWC,
+            FORMAT_CPIO_CRC,
+            FORMAT_CPIO_HPBIN,
+            FORMAT_CPIO_HPODC,
+        ):
             tarfile.format = detect_header(tarfile.fileobj)
 
         if tarfile.format in (FORMAT_CPIO_BIN, FORMAT_CPIO_HPBIN):
