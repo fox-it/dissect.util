@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone, tzinfo
 from platform import system
 from typing import Dict
 
-
 if system().lower() in ("windows", "emscripten"):
     _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 

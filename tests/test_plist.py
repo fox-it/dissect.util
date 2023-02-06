@@ -1,6 +1,6 @@
-import sys
 import datetime
 import plistlib
+import sys
 import uuid
 from unittest.mock import patch
 

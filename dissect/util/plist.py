@@ -1,9 +1,8 @@
-import uuid
 import plistlib
+import uuid
+from collections import UserDict
 
 from dissect.util.ts import cocoatimestamp
-
-from collections import UserDict
 
 
 class NSKeyedArchiver:

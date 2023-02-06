@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sys
 import struct
+import sys
 from typing import Any, Iterator, Union
 
 

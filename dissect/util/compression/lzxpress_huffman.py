@@ -6,7 +6,6 @@ import struct
 from collections import namedtuple
 from typing import BinaryIO, Optional, Union
 
-
 Symbol = namedtuple("Symbol", ["length", "symbol"])
 
 
