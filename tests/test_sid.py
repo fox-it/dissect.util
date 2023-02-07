@@ -4,7 +4,6 @@ import pytest
 
 from dissect.util import sid
 
-
 testdata = [
     (b"\x01\x00\x00\x00\x00\x00\x00\x00", "S-1-0"),
     (b"\x01\x01\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00", "S-1-1-0"),

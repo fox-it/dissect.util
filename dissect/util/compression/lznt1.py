@@ -1,7 +1,7 @@
 # Reference: https://github.com/google/rekall/blob/master/rekall-core/rekall/plugins/filesystems/lznt1.py
+import array
 import io
 import struct
-import array
 from typing import BinaryIO, Union
 
 
