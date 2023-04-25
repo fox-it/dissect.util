@@ -34,6 +34,7 @@ class AlignedStream(io.RawIOBase):
         self._pos_align = 0
 
         self._buf = None
+        self._seek_locked = False
 
     def _set_pos(self, pos: int) -> None:
         """Update the position and aligned position within the stream."""
@@ -69,6 +70,10 @@ class AlignedStream(io.RawIOBase):
 
     def seek(self, pos: int, whence: int = io.SEEK_SET) -> int:
         """Seek the stream to the specified position."""
+        # Check if a read-operation is ongoing
+        while self._seek_locked:
+            pass
+
         pos = self._seek(pos, whence)
         self._set_pos(pos)
 
@@ -86,6 +91,8 @@ class AlignedStream(io.RawIOBase):
         size = self.size
         align = self.align
 
+        self._seek_locked = True
+
         if size is None and n == -1:
             r = []
             if self._buf:
@@ -96,6 +103,7 @@ class AlignedStream(io.RawIOBase):
 
             buf = b"".join(r)
             self._set_pos(self._pos + len(buf))
+            self._seek_locked = False
             return buf
 
         if size is not None:
@@ -107,6 +115,7 @@ class AlignedStream(io.RawIOBase):
                 n = min(n, remaining)
 
         if n == 0 or size is not None and size <= self._pos:
+            self._seek_locked = False
             return b""
 
         # Read misaligned start from buffer
@@ -137,6 +146,7 @@ class AlignedStream(io.RawIOBase):
             r.append(self._buf[:n])
             self._set_pos(self._pos + n)
 
+        self._seek_locked = False
         return b"".join(r)
 
     def readinto(self, b: bytearray) -> int:
@@ -199,9 +209,12 @@ class RangeStream(AlignedStream):
         self.offset = offset
 
     def _read(self, offset: int, length: int) -> bytes:
+        self._seek_locked = True
         read_length = min(length, self.size - offset)
         self._fh.seek(self.offset + offset)
-        return self._fh.read(read_length)
+        data = self._fh.read(read_length)
+        self._seek_locked = False
+        return data
 
 
 class RelativeStream(AlignedStream):
@@ -235,9 +248,12 @@ class RelativeStream(AlignedStream):
         return super()._seek(pos, whence)
 
     def _read(self, offset: int, length: int) -> bytes:
+        self._seek_locked = True
         read_length = min(length, self.size - offset) if self.size else length
         self._fh.seek(self.offset + offset)
-        return self._fh.read(read_length)
+        data = self._fh.read(read_length)
+        self._seek_locked = False
+        return data
 
 
 class BufferedStream(RelativeStream):
