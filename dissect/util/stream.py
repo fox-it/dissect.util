@@ -209,12 +209,9 @@ class RangeStream(AlignedStream):
         self.offset = offset
 
     def _read(self, offset: int, length: int) -> bytes:
-        self._seek_locked = True
         read_length = min(length, self.size - offset)
         self._fh.seek(self.offset + offset)
-        data = self._fh.read(read_length)
-        self._seek_locked = False
-        return data
+        return self._fh.read(read_length)
 
 
 class RelativeStream(AlignedStream):
@@ -248,12 +245,9 @@ class RelativeStream(AlignedStream):
         return super()._seek(pos, whence)
 
     def _read(self, offset: int, length: int) -> bytes:
-        self._seek_locked = True
         read_length = min(length, self.size - offset) if self.size else length
         self._fh.seek(self.offset + offset)
-        data = self._fh.read(read_length)
-        self._seek_locked = False
-        return data
+        return self._fh.read(read_length)
 
 
 class BufferedStream(RelativeStream):
