@@ -140,7 +140,7 @@ class AlignedStream(io.RawIOBase):
                 self._fill_buf()
                 r.append(self._buf[:n])
                 self._set_pos(self._pos + n)
-            
+
             return b"".join(r)
 
     def readinto(self, b: bytearray) -> int:
