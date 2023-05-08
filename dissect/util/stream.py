@@ -1,6 +1,7 @@
 import io
 import os
 from bisect import bisect_left, bisect_right
+from threading import Lock
 from typing import BinaryIO, Optional, Union
 
 STREAM_BUFFER_SIZE = int(os.getenv("DISSECT_STREAM_BUFFER_SIZE", io.DEFAULT_BUFFER_SIZE))
@@ -34,6 +35,7 @@ class AlignedStream(io.RawIOBase):
         self._pos_align = 0
 
         self._buf = None
+        self._seek_lock = Lock()
 
     def _set_pos(self, pos: int) -> None:
         """Update the position and aligned position within the stream."""
@@ -69,10 +71,11 @@ class AlignedStream(io.RawIOBase):
 
     def seek(self, pos: int, whence: int = io.SEEK_SET) -> int:
         """Seek the stream to the specified position."""
-        pos = self._seek(pos, whence)
-        self._set_pos(pos)
+        with self._seek_lock:
+            pos = self._seek(pos, whence)
+            self._set_pos(pos)
 
-        return pos
+            return pos
 
     def read(self, n: int = -1) -> bytes:
         """Read and return up to n bytes, or read to the end of the stream if n is -1.
@@ -86,58 +89,59 @@ class AlignedStream(io.RawIOBase):
         size = self.size
         align = self.align
 
-        if size is None and n == -1:
-            r = []
-            if self._buf:
+        with self._seek_lock:
+            if size is None and n == -1:
+                r = []
+                if self._buf:
+                    buffer_pos = self._pos - self._pos_align
+                    r.append(self._buf[buffer_pos:])
+
+                r.append(self._read(self._pos_align + align, -1))
+
+                buf = b"".join(r)
+                self._set_pos(self._pos + len(buf))
+                return buf
+
+            if size is not None:
+                remaining = size - self._pos
+
+                if n == -1:
+                    n = remaining
+                else:
+                    n = min(n, remaining)
+
+            if n == 0 or size is not None and size <= self._pos:
+                return b""
+
+            # Read misaligned start from buffer
+            if self._pos != self._pos_align:
+                self._fill_buf()
+
                 buffer_pos = self._pos - self._pos_align
-                r.append(self._buf[buffer_pos:])
+                remaining = align - buffer_pos
+                buffer_len = min(n, remaining)
 
-            r.append(self._read(self._pos_align + align, -1))
+                r.append(self._buf[buffer_pos : buffer_pos + buffer_len])
 
-            buf = b"".join(r)
-            self._set_pos(self._pos + len(buf))
-            return buf
+                n -= buffer_len
+                self._set_pos(self._pos + buffer_len)
 
-        if size is not None:
-            remaining = size - self._pos
+            # Aligned blocks
+            if n >= align:
+                count, n = divmod(n, align)
 
-            if n == -1:
-                n = remaining
-            else:
-                n = min(n, remaining)
+                read_len = count * align
+                r.append(self._read(self._pos, read_len))
 
-        if n == 0 or size is not None and size <= self._pos:
-            return b""
+                self._set_pos(self._pos + read_len)
 
-        # Read misaligned start from buffer
-        if self._pos != self._pos_align:
-            self._fill_buf()
+            # Misaligned end
+            if n > 0:
+                self._fill_buf()
+                r.append(self._buf[:n])
+                self._set_pos(self._pos + n)
 
-            buffer_pos = self._pos - self._pos_align
-            remaining = align - buffer_pos
-            buffer_len = min(n, remaining)
-
-            r.append(self._buf[buffer_pos : buffer_pos + buffer_len])
-
-            n -= buffer_len
-            self._set_pos(self._pos + buffer_len)
-
-        # Aligned blocks
-        if n >= align:
-            count, n = divmod(n, align)
-
-            read_len = count * align
-            r.append(self._read(self._pos, read_len))
-
-            self._set_pos(self._pos + read_len)
-
-        # Misaligned end
-        if n > 0:
-            self._fill_buf()
-            r.append(self._buf[:n])
-            self._set_pos(self._pos + n)
-
-        return b"".join(r)
+            return b"".join(r)
 
     def readinto(self, b: bytearray) -> int:
         """Read bytes into a pre-allocated bytes-like object b.
