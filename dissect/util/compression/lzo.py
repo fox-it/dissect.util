@@ -1,32 +1,20 @@
+# Derived from https://github.com/FFmpeg/FFmpeg/blob/master/libavutil/lzo.c
+
 import io
 import struct
 from typing import BinaryIO, Union
 
 
-def _count_zeroes(src: BinaryIO):
-    length = 0
-    val = src.read(1)[0]
-    while val == 0:
-        length += 255
-        val = src.read(1)[0]
-        if length > 2**20:
-            raise ValueError("Too many zeroes")
+def _read_length(src: BinaryIO, val: int, mask: int) -> int:
+    length = val & mask
+    if not length:
+        while (val := src.read(1)[0]) == 0:
+            if length >= (1 << 32) - 1000:
+                raise ValueError("Invalid encoded length")
+            length += 255
 
-    return length + val
-
-
-def _copy_block(src: BinaryIO, dst: bytearray, length: int, distance: int, trailing: int):
-    remaining = length
-
-    block = dst[-distance:]
-    remaining -= len(block)
-    while remaining > 0:
-        add = block[:remaining]
-        remaining -= len(add)
-        block += add
-
-    dst.extend(block[:length])
-    dst.extend(src.read(trailing))
+        length += mask + val
+    return length
 
 
 def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -1) -> bytes:
@@ -58,54 +46,49 @@ def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -
     val = src.read(1)[0]
     if val == 0x10:
         raise ValueError("LZOv1")
-    elif val >= 0x12:
-        dst += src.read(val - 0x11)
+    elif val > 17:
+        dst += src.read(val - 17)
         val = src.read(1)[0]
 
-    trailing = 0
+        if val < 16:
+            raise ValueError("Invalid LZO stream")
+
+    state = 0
     while True:
-        if val <= 0xF:
-            if not trailing:
-                if val == 0:
-                    dst += src.read(_count_zeroes(src) + 18)
-                else:
-                    dst += src.read(val + 3)
+        if val > 15:
+            if val > 63:
+                length = (val >> 5) - 1
+                dist = (src.read(1)[0] << 3) + ((val >> 2) & 7) + 1
+            elif val > 31:
+                length = _read_length(src, val, 31)
+                val = src.read(1)[0]
+                dist = (src.read(1)[0] << 6) + (val >> 2) + 1
             else:
-                h = src.read(1)[0]
-                dist = (h << 2) + (val >> 2) + 1
-                length = 2
-                trailing = val & 3
-                _copy_block(src, dst, length, dist, trailing)
-        elif val <= 0x1F:
-            if val & 7 == 0:
-                length = 9 + _count_zeroes(src)
-            else:
-                length = (val & 7) + 2
-            ds = struct.unpack("<H", src.read(2))[0]
-            dist = 16384 + ((val & 8) >> 3) + (ds >> 2)
-            if dist == 16384:
-                break
-            trailing = ds & 3
-            _copy_block(src, dst, length, dist, trailing)
-        elif val <= 0x3F:
-            length = val & 31
-            if length == 0:
-                length = _count_zeroes(src) + 31
-            length += 2
-            ds = struct.unpack("<H", src.read(2))[0]
-            dist = 1 + (ds >> 2)
-            trailing = ds & 3
-            _copy_block(src, dst, length, dist, trailing)
+                length = _read_length(src, val, 7)
+                dist = (1 << 14) + ((val & 8) << 11)
+                val = src.read(1)[0]
+                dist += (src.read(1)[0] << 6) + (val >> 2)
+                if dist == (1 << 14):
+                    if length != 1:
+                        raise ValueError("Invalid LZO stream")
+                    break
+        elif not state:
+            length = _read_length(src, val, 15)
+            dst += src.read(length + 3)
+            val = src.read(1)[0]
+            if val > 15:
+                continue
+            length = 1
+            dist = (1 << 11) + (src.read(1)[0] << 2) + (val >> 2) + 1
         else:
-            if val <= 0x7F:
-                length = 3 + ((val >> 5) & 1)
-            else:
-                length = 5 + ((val >> 5) & 3)
-            h = src.read(1)[0]
-            d = (val >> 2) & 7
-            dist = (h << 3) + d + 1
-            trailing = val & 3
-            _copy_block(src, dst, length, dist, trailing)
+            length = 0
+            dist = (src.read(1)[0] << 2) + (val >> 2) + 1
+
+        for _ in range(length + 2):
+            dst.append(dst[-dist])
+
+        state = length = val & 3
+        dst += src.read(length)
 
         if len(dst) == out_len:
             break
