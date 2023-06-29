@@ -4,17 +4,19 @@ import io
 import struct
 from typing import BinaryIO, Union
 
+MAX_READ_LENGTH = (1 << 32) - 1000
+
 
 def _read_length(src: BinaryIO, val: int, mask: int) -> int:
-    length = val & mask
-    if not length:
-        while (val := src.read(1)[0]) == 0:
-            if length >= (1 << 32) - 1000:
-                raise ValueError("Invalid encoded length")
-            length += 255
+    if (length := val & mask) != 0:
+        return length
 
-        length += mask + val
-    return length
+    while (val := src.read(1)[0]) == 0:
+        if length >= MAX_READ_LENGTH:
+            raise ValueError("Invalid encoded length")
+        length += 255
+
+    return length + mask + val
 
 
 def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -1) -> bytes:
@@ -44,9 +46,15 @@ def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -
         out_len = buflen
 
     val = src.read(1)[0]
-    if val == 0x10:
-        raise ValueError("LZOv1")
-    elif val > 17:
+    offset = src.tell()
+    if src.seek(5) == 5 and val == 17:
+        src.seek(offset)
+        _ = src.read(1)  # This would be the bitstream version but we don't currently use it
+        val = src.read(1)[0]
+    else:
+        src.seek(offset)
+
+    if val > 17:
         dst += src.read(val - 17)
         val = src.read(1)[0]
 
