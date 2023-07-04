@@ -1,4 +1,7 @@
-# Derived from https://github.com/FFmpeg/FFmpeg/blob/master/libavutil/lzo.c
+# References:
+# - https://github.com/FFmpeg/FFmpeg/blob/master/libavutil/lzo.c
+# - https://docs.kernel.org/staging/lzo.html
+# - https://github.com/torvalds/linux/blob/master/lib/lzo/lzo1x_decompress_safe.c
 
 import io
 import struct
