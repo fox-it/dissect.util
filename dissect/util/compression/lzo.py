@@ -68,13 +68,16 @@ def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -
     while True:
         if val > 15:
             if val > 63:
+                # Copy 3-8 bytes from block within 2kb distance
                 length = (val >> 5) - 1
                 dist = (src.read(1)[0] << 3) + ((val >> 2) & 7) + 1
             elif val > 31:
+                # Copy of small block within 16kb distance
                 length = _read_length(src, val, 31)
                 val = src.read(1)[0]
                 dist = (src.read(1)[0] << 6) + (val >> 2) + 1
             else:
+                # Copy of a block within 16...48kB distance
                 length = _read_length(src, val, 7)
                 dist = (1 << 14) + ((val & 8) << 11)
                 val = src.read(1)[0]
@@ -84,6 +87,7 @@ def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -
                         raise ValueError("Invalid LZO stream")
                     break
         elif not state:
+            # Copy 4 or more literals, depending on the last 4 bits.
             length = _read_length(src, val, 15)
             dst += src.read(length + 3)
             val = src.read(1)[0]
@@ -98,6 +102,7 @@ def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -
         for _ in range(length + 2):
             dst.append(dst[-dist])
 
+        # State is often encoded in the  last 2 bits of the value, and used in subsequent iterations
         state = length = val & 3
         dst += src.read(length)
 
