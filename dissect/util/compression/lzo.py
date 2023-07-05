@@ -87,7 +87,7 @@ def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -
                         raise ValueError("Invalid LZO stream")
                     break
         elif not state:
-            # Copy 4 or more literals, depending on the last 4 bits.
+            # Copy 4 or more literals, depending on the last 4 bits
             length = _read_length(src, val, 15)
             dst += src.read(length + 3)
             val = src.read(1)[0]
@@ -102,7 +102,7 @@ def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -
         for _ in range(length + 2):
             dst.append(dst[-dist])
 
-        # State is often encoded in the  last 2 bits of the value, and used in subsequent iterations
+        # State is often encoded in the last 2 bits of the value, and used in subsequent iterations
         state = length = val & 3
         dst += src.read(length)
 
