@@ -355,8 +355,10 @@ class RunlistStream(AlignedStream):
         block_size: The block size in bytes.
     """
 
-    def __init__(self, fh: BinaryIO, runlist: list[tuple[int, int]], size: int, block_size: int):
-        super().__init__(size, block_size)
+    def __init__(
+        self, fh: BinaryIO, runlist: list[tuple[int, int]], size: int, block_size: int, align: Optional[int] = None
+    ):
+        super().__init__(size, align or block_size)
 
         if isinstance(fh, RunlistStream):
             self._fh = fh._fh
