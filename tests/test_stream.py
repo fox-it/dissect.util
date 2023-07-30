@@ -1,11 +1,12 @@
 import io
+from unittest.mock import Mock
 
 import pytest
 
 from dissect.util import stream
 
 
-def test_range_stream():
+def test_range_stream() -> None:
     buf = io.BytesIO(b"\x01" * 10 + b"\x02" * 10 + b"\x03" * 10)
     fh = stream.RangeStream(buf, 5, 15)
 
@@ -39,7 +40,7 @@ def test_range_stream():
     assert fh.tell() == 0
 
 
-def test_relative_stream():
+def test_relative_stream() -> None:
     buf = io.BytesIO(b"\x01" * 10 + b"\x02" * 10 + b"\x03" * 10)
     fh = stream.RelativeStream(buf, 5)
 
@@ -59,17 +60,18 @@ def test_relative_stream():
     assert fh.read(1) == b""
 
 
-def test_buffered_stream():
+def test_buffered_stream() -> None:
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512)
     fh = stream.BufferedStream(buf, size=None)
 
     assert fh.read(10) == b"\x01" * 10
-    assert fh._buf == buf.getvalue()
+    assert fh._buf[: len(buf.getvalue())] == buf.getvalue()
+    assert fh._buf_size == 512 * 3
     assert fh.read() == buf.getvalue()[10:]
     assert fh.read(1) == b""
 
 
-def test_mapping_stream():
+def test_mapping_stream() -> None:
     buffers = [
         io.BytesIO(b"\x01" * 512),
         io.BytesIO(b"\x02" * 512),
@@ -90,7 +92,7 @@ def test_mapping_stream():
     assert fh.read(1) == b""
 
 
-def test_runlist_stream():
+def test_runlist_stream() -> None:
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512)
     fh = stream.RunlistStream(buf, [(0, 32), (32, 16), (48, 48)], 1536, 16)
 
@@ -106,7 +108,7 @@ def test_runlist_stream():
     assert fh.read(1) == b""
 
 
-def test_aligned_stream_buffer():
+def test_aligned_stream_buffer() -> None:
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512 + b"\x04" * 512)
     fh = stream.RelativeStream(buf, 0, align=512)
 
@@ -118,13 +120,13 @@ def test_aligned_stream_buffer():
     # Read aligned blocks so we move past the offset from where the buffer was read
     fh.read(1024)
     # Buffer should be reset
-    assert fh._buf is None
+    assert fh._buf_size == 0
     # Buffer should now be from the 3rd aligned block
     assert fh.read(256) == b"\x03" * 256
     assert fh._buf == b"\x03" * 512
 
 
-def test_overlay_stream():
+def test_overlay_stream() -> None:
     buf = io.BytesIO(b"\x00" * 512 * 8)
     fh = stream.OverlayStream(buf, size=512 * 8, align=512)
 
@@ -166,3 +168,17 @@ def test_overlay_stream():
     fh.add((512 * 8) - 4, b"\x04" * 100)
     fh.seek((512 * 8) - 4)
     assert fh.read(100) == b"\x04" * 4
+
+
+def test_layered_readinto() -> None:
+    size = 1024 * 64
+    buf = io.BytesIO(b"\x42" * size)
+    mock_buffer = Mock(wraps=buf)
+
+    fh = stream.BufferedStream(stream.BufferedStream(mock_buffer, 0, size), 0, size)
+    tmp = bytearray(1024)
+    fh.readinto(tmp)
+
+    # Test the bottom layer buffer was called with the cache object of the top layer
+    mock_buffer.readinto.assert_called_once()
+    assert mock_buffer.readinto.call_args[0][0].obj is fh._buf.obj
