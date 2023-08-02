@@ -353,6 +353,7 @@ class RunlistStream(AlignedStream):
         runlist: The runlist for this stream in block units.
         size: The size of the stream. This can be smaller than the total sum of blocks (to account for slack space).
         block_size: The block size in bytes.
+        align: Optional alignment that differs from the block size, otherwise ``block_size`` is used as alignment.
     """
 
     def __init__(
