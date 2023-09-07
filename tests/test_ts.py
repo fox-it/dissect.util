@@ -1,5 +1,5 @@
 import platform
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from importlib import reload
 from unittest.mock import patch
 
@@ -21,10 +21,14 @@ def ts():
     yield reload(ts)
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Time Calculation error. Needs to be fixed.")
 def test_now(ts):
-    assert ts.now() < datetime.now(timezone.utc)
-    assert ts.now().tzinfo == timezone.utc
+    ts_now = ts.now()
+    datetime_now = datetime.now(timezone.utc)
+    time_diff = datetime_now - ts_now
+
+    # set microseconds equal to remove the processing time difference
+    assert timedelta(0, 0, microseconds=time_diff.microseconds) == time_diff
+    assert ts_now.tzinfo == timezone.utc
 
 
 def test_unix_now(imported_ts):
@@ -111,7 +115,6 @@ def test_wintimestamp(imported_ts):
     )
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Time Calculation error. Needs to be fixed.")
 def test_oatimestamp(imported_ts):
     dt = datetime(2016, 10, 17, 4, 6, 38, 362003, tzinfo=timezone.utc)
     assert imported_ts.oatimestamp(42660.171277338) == dt
@@ -130,7 +133,6 @@ def test_cocoatimestamp(imported_ts):
     assert imported_ts.cocoatimestamp(622894123.221783) == datetime(2020, 9, 27, 10, 8, 43, 221783, tzinfo=timezone.utc)
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Time Calculation error. Needs to be fixed.")
 def test_negative_timestamps(imported_ts):
     # -5000.0 converted to a int representation
     assert imported_ts.oatimestamp(13885591609694748672) == datetime(1886, 4, 22, 0, 0, tzinfo=timezone.utc)
