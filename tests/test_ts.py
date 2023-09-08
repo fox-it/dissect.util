@@ -26,8 +26,8 @@ def test_now(ts):
     datetime_now = datetime.now(timezone.utc)
     time_diff = datetime_now - ts_now
 
-    # set microseconds equal to remove the processing time difference
-    assert timedelta(0, 0, microseconds=time_diff.microseconds) == time_diff
+    # Should be no difference, so only set microseconds equal to remove processing time difference
+    assert timedelta(microseconds=time_diff.microseconds) == time_diff
     assert ts_now.tzinfo == timezone.utc
 
 
