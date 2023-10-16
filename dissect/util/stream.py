@@ -95,8 +95,9 @@ class AlignedStream(io.RawIOBase):
                 if self._buf:
                     buffer_pos = self._pos - self._pos_align
                     r.append(self._buf[buffer_pos:])
+                    self._set_pos(self._pos_align + align)
 
-                r.append(self._read(self._pos_align + align, -1))
+                r.append(self._read(self._pos_align, -1))
 
                 buf = b"".join(r)
                 self._set_pos(self._pos + len(buf))

@@ -58,6 +58,10 @@ def test_relative_stream():
     assert fh.read(15) == b"\x02" * 5 + b"\x03" * 10
     assert fh.read(1) == b""
 
+    fh.seek(0)
+    fh._buf = None
+    assert fh.read() == b"\x01" * 5 + b"\x02" * 10 + b"\x03" * 10
+
 
 def test_buffered_stream():
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512)
