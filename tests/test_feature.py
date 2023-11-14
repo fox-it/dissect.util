@@ -1,12 +1,6 @@
 import pytest
 
-from dissect.util.feature import (
-    Feature,
-    FeatureException,
-    check_flags,
-    feature,
-    feature_enabled,
-)
+from dissect.util.feature import Feature, FeatureException, feature, feature_enabled
 
 
 def test_feature_flags() -> None:
@@ -17,8 +11,8 @@ def test_feature_flags() -> None:
     def experimental():
         return True
 
-    @feature(Feature.NOVICE, fallback)
-    def novice():
+    @feature(Feature.ADVANCED, fallback)
+    def advanced():
         return True
 
     @feature(Feature.LATEST)
@@ -30,15 +24,10 @@ def test_feature_flags() -> None:
         return True
 
     assert experimental() is False
-    assert novice() is True
+    assert advanced() is False
     assert latest() is True
     with pytest.raises(FeatureException):
         assert expert() is True
-
-
-def test_feature_flag_verification() -> None:
-    with pytest.raises(FeatureException):
-        check_flags(["chaotic"])
 
 
 def test_feature_flag_inline() -> None:
