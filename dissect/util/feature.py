@@ -6,8 +6,8 @@ from typing import Callable, Optional
 
 # Register feature flags in a central place to avoid chaos
 class Feature(Enum):
-    ADVANCED = "advanced"
     LATEST = "latest"
+    ADVANCED = "advanced"
     BETA = "beta"
 
 
