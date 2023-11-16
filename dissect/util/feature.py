@@ -29,14 +29,21 @@ def feature_flags() -> list[Feature]:
 
 @functools.cache
 def feature_enabled(feature: Feature) -> bool:
+    """Use this function for block-level feature flag control.
+
+    Usage::
+
+        def parse_blob():
+            if feature_enabled(Feature.BETA):
+                self._parse_fast_experimental()
+            else:
+                self._parse_normal()
+
+    """
     return feature in feature_flags()
 
 
-def feature_disabled_stub() -> None:
-    raise FeatureException("This feature has been disabled.")
-
-
-def feature(flag: Feature, alternative: Optional[Callable] = feature_disabled_stub) -> Callable:
+def feature(flag: Feature, alternative: Optional[Callable] = None) -> Callable:
     """Feature flag decorator allowing you to guard a function behind a feature flag.
 
     Usage::
@@ -47,6 +54,19 @@ def feature(flag: Feature, alternative: Optional[Callable] = feature_disabled_st
     Where ``SOME_FLAG`` is the feature you want to check for and ``fallback`` is the alternative function to serve
     if the feature flag is NOT set.
     """
+
+    if alternative is None:
+
+        def alternative():
+            raise FeatureException(
+                "\n".join(
+                    [
+                        "Feature disabled.",
+                        f"Set FLAG '{flag}' in {DISSECT_FEATURES_ENV} to enable.",
+                        "See https://docs.dissect.tools/en/latest/advanced/flags.html",
+                    ]
+                )
+            )
 
     def decorator(func):
         return func if feature_enabled(flag) else alternative
