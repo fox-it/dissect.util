@@ -37,7 +37,8 @@ def feature_disabled_stub() -> None:
 
 
 def feature(flag: Feature, alternative: Optional[Callable] = feature_disabled_stub) -> Callable:
-    """
+    """Feature flag decorator allowing you to guard a function behind a feature flag.
+
     Usage::
 
         @feature(Feature.SOME_FLAG, fallback)
