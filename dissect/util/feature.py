@@ -43,8 +43,7 @@ def feature(flag: Feature, alternative: Optional[Callable] = feature_disabled_st
         @feature(Feature.SOME_FLAG, fallback)
         def my_func( ... ) -> ...
 
-    Where SOME_FLAG is the feature you want to check for and
-    altfunc is the alternative function to serve
+    Where ``SOME_FLAG`` is the feature you want to check for and ``fallback`` is the alternative function to serve
     if the feature flag is NOT set.
     """
 
