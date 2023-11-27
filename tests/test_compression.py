@@ -212,6 +212,8 @@ def test_lzo_decompress():
         == "efcff6f6fddf392a7d63966d2441accb27a62d61fe9aa57c5cb521d75e871f0c"
     )
 
+    assert lzo.decompress(bytes.fromhex("f0000000041574657374110000")) == b"test"
+
 
 def test_lzxpress_huffman_decompress():
     assert (
