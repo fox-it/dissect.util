@@ -565,7 +565,7 @@ class ZlibStream(AlignedStream):
         size: The size the stream should be.
     """
 
-    def __init__(self, fh: BinaryIO, size: Optional[int] = None, **kwargs):
+    def __init__(self, fh: BinaryIO, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE, **kwargs):
         self._fh = fh
 
         self._zlib = None
@@ -575,7 +575,7 @@ class ZlibStream(AlignedStream):
         self._zlib_prepend_offset = None
         self._rewind()
 
-        super().__init__(size)
+        super().__init__(size, align)
 
     def _rewind(self) -> None:
         self._fh.seek(0)
@@ -600,7 +600,7 @@ class ZlibStream(AlignedStream):
         if self._zlib_prepend_offset + length <= len(self._zlib_prepend):
             offset = self._zlib_prepend_offset
             self._zlib_prepend_offset += length
-            return self._zlib_prepend_offset[offset : self._zlib_prepend_offset]
+            return self._zlib_prepend[offset : self._zlib_prepend_offset]
         else:
             offset = self._zlib_prepend_offset
             self._zlib_prepend_offset = None
@@ -634,6 +634,8 @@ class ZlibStream(AlignedStream):
         return self._read_zlib(length)
 
     def readall(self) -> bytes:
+        self._seek_zlib(self.tell())
+
         chunks = []
         # sys.maxsize means the max length of output buffer is unlimited,
         # so that the whole input buffer can be decompressed within one
