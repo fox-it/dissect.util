@@ -601,10 +601,10 @@ class ZlibStream(AlignedStream):
             offset = self._zlib_prepend_offset
             self._zlib_prepend_offset += length
             return self._zlib_prepend[offset : self._zlib_prepend_offset]
-        else:
-            offset = self._zlib_prepend_offset
-            self._zlib_prepend_offset = None
-            return self._zlib_prepend[offset:] + self._fh.read(length - len(self._zlib_prepend) + offset)
+
+        offset = self._zlib_prepend_offset
+        self._zlib_prepend_offset = None
+        return self._zlib_prepend[offset:] + self._fh.read(length - len(self._zlib_prepend) + offset)
 
     def _read_zlib(self, length: int) -> bytes:
         if length < 0:
