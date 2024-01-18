@@ -1,4 +1,6 @@
 import hashlib
+import lzma
+from io import BytesIO
 
 from dissect.util.compression import (
     lz4,
@@ -7,6 +9,7 @@ from dissect.util.compression import (
     lzxpress,
     lzxpress_huffman,
     sevenbit,
+    xz,
 )
 
 
@@ -254,3 +257,16 @@ def test_sevenbit_decompress_wide():
     result = sevenbit.decompress(bytes.fromhex("b796384d078ddf6db8bc3c9fa7df6e10bd3ca783e67479da7d06"), wide=True)
     target = "7-bit compression test string".encode("utf-16-le")
     assert result == target
+
+
+def test_xz_repair_checksum():
+    buf = BytesIO(
+        bytes.fromhex(
+            "fd377a585a000004deadbeef0200210116000000deadbeefe00fff001e5d003a"
+            "194ace2b0f238ce989a29cfeb182a4e814985366b771770233ca314836000000"
+            "2972e8fd62b18ee300013a8020000000deadbeefdeadbeef020000000004595a"
+        )
+    )
+    repaired = xz.repair_checksum(buf)
+
+    assert lzma.decompress(repaired.read()) == b"test" * 1024
