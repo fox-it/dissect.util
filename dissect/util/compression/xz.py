@@ -22,7 +22,7 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
         fh: A file-like object of an LZMA stream to repair.
     """
     file_size = fh.seek(0, io.SEEK_END)
-    repaired = OverlayStream(fh, size)
+    repaired = OverlayStream(fh, file_size)
     fh.seek(0)
 
     header = fh.read(HEADER_FOOTER_SIZE)
@@ -32,7 +32,7 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
         raise ValueError("Not an XZ file")
 
     # Add correct header CRC32
-    repaired.add(8, _crc32(header[6:8]))
+    repaired.add(HEADER_FOOTER_SIZE - CRC_SIZE, _crc32(header[6:8]))
 
     footer_offset = fh.seek(-HEADER_FOOTER_SIZE, io.SEEK_END)
     footer = fh.read(HEADER_FOOTER_SIZE)
