@@ -21,7 +21,7 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
     Args:
         fh: A file-like object of an LZMA stream to repair.
     """
-    size = fh.seek(0, io.SEEK_END)
+    file_size = fh.seek(0, io.SEEK_END)
     repaired = OverlayStream(fh, size)
     fh.seek(0)
 
@@ -75,7 +75,7 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
         index = index[isize:]
         records.append((unpadded_size, uncompressed_size))
 
-    block_start = size - 12 - backward_size
+    block_start = file_size - HEADER_FOOTER_SIZE - backward_size
     blocks_len = sum((unpadded_size + 3) & ~3 for unpadded_size, _ in records)
     block_start -= blocks_len
 
@@ -86,7 +86,7 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
         block_header = fh.read(1)
         block_header_size = (block_header[0] + 1) * 4
         block_header += fh.read(block_header_size - 1)
-        repaired.add(fh.tell() - CRC_SIZE, _crc32(block_header[:-4]))
+        repaired.add(fh.tell() - CRC_SIZE, _crc32(block_header[:-CRC_SIZE]))
 
         block_start += (unpadded_size + 3) & ~3
 
@@ -109,4 +109,4 @@ def _mbi(data: bytes) -> tuple[int, int]:
 
 
 def _crc32(data: bytes) -> bytes:
-    return int.to_bytes(crc32(data), 4, "little")
+    return int.to_bytes(crc32(data), CRC_SIZE, "little")
