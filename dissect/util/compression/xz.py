@@ -32,7 +32,7 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
         raise ValueError("Not an XZ file")
 
     # Add correct header CRC32
-    repaired.add(HEADER_FOOTER_SIZE - CRC_SIZE, _crc32(header[6:8]))
+    repaired.add(HEADER_FOOTER_SIZE - CRC_SIZE, _crc32(header[len(magic) : HEADER_FOOTER_SIZE - CRC_SIZE]))
 
     footer_offset = fh.seek(-HEADER_FOOTER_SIZE, io.SEEK_END)
     footer = fh.read(HEADER_FOOTER_SIZE)
