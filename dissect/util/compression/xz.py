@@ -4,6 +4,9 @@ from typing import BinaryIO
 
 from dissect.util.stream import OverlayStream
 
+HEADER_FOOTER_SIZE = 12
+CRC_SIZE = 4
+
 
 def repair_checksum(fh: BinaryIO) -> BinaryIO:
     """Repair CRC32 checksums for all headers in an XZ stream.
@@ -22,50 +25,52 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
     repaired = OverlayStream(fh, size)
     fh.seek(0)
 
-    header = fh.read(12)
+    header = fh.read(HEADER_FOOTER_SIZE)
     # Check header magic
-    if header[:6] != b"\xfd7zXZ\x00":
+    magic = b"\xfd7zXZ\x00"
+    if header[: len(magic)] != magic:
         raise ValueError("Not an XZ file")
 
     # Add correct header CRC32
     repaired.add(8, _crc32(header[6:8]))
 
-    fh.seek(-12, io.SEEK_END)
-    footer = fh.read(12)
+    footer_offset = fh.seek(-HEADER_FOOTER_SIZE, io.SEEK_END)
+    footer = fh.read(HEADER_FOOTER_SIZE)
 
     # Check footer magic
-    if footer[10:12] != b"YZ":
+    footer_magic = b"YZ"
+    if footer[HEADER_FOOTER_SIZE - len(footer_magic) : HEADER_FOOTER_SIZE] != footer_magic:
         raise ValueError("Not an XZ file")
 
     # Add correct footer CRC32
-    repaired.add(fh.tell() - 12, _crc32(footer[4:10]))
+    repaired.add(footer_offset, _crc32(footer[CRC_SIZE : HEADER_FOOTER_SIZE - len(footer_magic)]))
 
     backward_size = (int.from_bytes(footer[4:8], "little") + 1) * 4
-    fh.seek(-12 - backward_size, io.SEEK_END)
+    fh.seek(-HEADER_FOOTER_SIZE - backward_size, io.SEEK_END)
     index = fh.read(backward_size)
 
     # Add correct index CRC32
-    repaired.add(fh.tell() - 4, _crc32(index[:-4]))
+    repaired.add(fh.tell() - CRC_SIZE, _crc32(index[:-CRC_SIZE]))
 
     # Parse the index
-    isize, nb_records = _mbi(index[1:])
+    isize, num_records = _mbi(index[1:])
     index = index[1 + isize : -4]
     records = []
-    for _ in range(nb_records):
+    for _ in range(num_records):
         if not index:
-            raise ValueError("index size")
+            raise ValueError("Missing index size")
 
         isize, unpadded_size = _mbi(index)
         if not unpadded_size:
-            raise ValueError("index record unpadded size")
+            raise ValueError("Missing index record unpadded size")
 
         index = index[isize:]
         if not index:
-            raise ValueError("index size")
+            raise ValueError("Missing index size")
 
         isize, uncompressed_size = _mbi(index)
         if not uncompressed_size:
-            raise ValueError("index record uncompressed size")
+            raise ValueError("Missing index record uncompressed size")
 
         index = index[isize:]
         records.append((unpadded_size, uncompressed_size))
@@ -81,7 +86,7 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
         block_header = fh.read(1)
         block_header_size = (block_header[0] + 1) * 4
         block_header += fh.read(block_header_size - 1)
-        repaired.add(fh.tell() - 4, _crc32(block_header[:-4]))
+        repaired.add(fh.tell() - CRC_SIZE, _crc32(block_header[:-4]))
 
         block_start += (unpadded_size + 3) & ~3
 
@@ -89,6 +94,12 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
 
 
 def _mbi(data: bytes) -> tuple[int, int]:
+    """Decode a multibyte integer.
+
+    The encoding is similar to most other "varint" encodings. For each byte, the 7 least significant bits are used for
+    the integer value. The most significant bit is used to indicate if the integer continues in the next byte.
+    Bytes are ordered in little endian byte order, meaning the least significant byte comes first.
+    """
     value = 0
     for size, byte in enumerate(data):
         value |= (byte & 0x7F) << (size * 7)
