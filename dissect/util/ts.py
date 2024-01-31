@@ -1,9 +1,9 @@
 import struct
+import sys
 from datetime import datetime, timedelta, timezone, tzinfo
-from platform import system
 from typing import Dict
 
-if system().lower() in ("windows", "emscripten"):
+if sys.platform in ("win32", "emscripten"):
     _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
     def _calculate_timestamp(ts: float) -> datetime:

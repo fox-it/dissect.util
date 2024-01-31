@@ -1,4 +1,6 @@
 import io
+import zlib
+from unittest.mock import patch
 
 import pytest
 
@@ -57,6 +59,10 @@ def test_relative_stream():
     assert fh.tell() == 10
     assert fh.read(15) == b"\x02" * 5 + b"\x03" * 10
     assert fh.read(1) == b""
+
+    fh.seek(0)
+    fh._buf = None
+    assert fh.read() == b"\x01" * 5 + b"\x02" * 10 + b"\x03" * 10
 
 
 def test_buffered_stream():
@@ -166,3 +172,34 @@ def test_overlay_stream():
     fh.add((512 * 8) - 4, b"\x04" * 100)
     fh.seek((512 * 8) - 4)
     assert fh.read(100) == b"\x04" * 4
+
+
+def test_zlib_stream():
+    data = b"\x01" * 8192 + b"\x02" * 8192 + b"\x03" * 8192 + b"\x04" * 8192
+    fh = stream.ZlibStream(io.BytesIO(zlib.compress(data)), size=8192 * 4, align=512)
+
+    assert fh.read(8192) == b"\x01" * 8192
+    assert fh.read(8192) == b"\x02" * 8192
+    assert fh.read(8192) == b"\x03" * 8192
+    assert fh.read(8192) == b"\x04" * 8192
+    assert fh.read(1) == b""
+
+    fh.seek(0)
+    assert fh.read(8192) == b"\x01" * 8192
+
+    fh.seek(1024)
+    assert fh.read(8192) == b"\x01" * 7168 + b"\x02" * 1024
+
+    fh.seek(512)
+    assert fh.read(1024) == b"\x01" * 1024
+
+    fh.seek(0)
+    assert fh.readall() == data
+
+    fh.seek(512)
+    assert fh.read(1024) == b"\x01" * 1024
+    with patch("io.DEFAULT_BUFFER_SIZE", 8):
+        assert fh.read(1024) == b"\x01" * 1024
+
+    fh.seek(0)
+    assert fh.read() == data

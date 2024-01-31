@@ -1,9 +1,17 @@
-from dissect.util.compression import lz4, lznt1, lzxpress, lzxpress_huffman, sevenbit
+from dissect.util.compression import (
+    lz4,
+    lznt1,
+    lzo,
+    lzxpress,
+    lzxpress_huffman,
+    sevenbit,
+)
 
 __all__ = [
     "lz4",
     "lznt1",
-    "lzxpress",
+    "lzo",
     "lzxpress_huffman",
+    "lzxpress",
     "sevenbit",
 ]
