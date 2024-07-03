@@ -2,6 +2,8 @@ import hashlib
 import lzma
 from io import BytesIO
 
+import pytest
+
 from dissect.util.compression import (
     lz4,
     lznt1,
@@ -267,6 +269,9 @@ def test_xz_repair_checksum():
             "2972e8fd62b18ee300013a8020000000deadbeefdeadbeef020000000004595a"
         )
     )
-    repaired = xz.repair_checksum(buf)
 
+    with pytest.raises(lzma.LZMAError, match="Corrupt input data"):
+        lzma.decompress(buf.getvalue())
+
+    repaired = xz.repair_checksum(buf)
     assert lzma.decompress(repaired.read()) == b"test" * 1024
