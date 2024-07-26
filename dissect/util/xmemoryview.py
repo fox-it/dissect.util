@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import struct
 import sys
-from typing import Any, Iterator, Union
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
-def xmemoryview(view: bytes, format: str) -> Union[memoryview, _xmemoryview]:
+def xmemoryview(view: bytes, format: str) -> memoryview | _xmemoryview:
     """Cast a memoryview to the specified format, including endianness.
 
     The regular ``memoryview.cast()`` method only supports host endianness. While that should be fine 99% of the time
@@ -43,9 +46,9 @@ def xmemoryview(view: bytes, format: str) -> Union[memoryview, _xmemoryview]:
     ):
         # Native endianness, don't need to do anything
         return view
-    else:
-        # Non-native endianness
-        return _xmemoryview(view, format)
+
+    # Non-native endianness
+    return _xmemoryview(view, format)
 
 
 class _xmemoryview:
@@ -67,7 +70,7 @@ class _xmemoryview:
     def tolist(self) -> list[int]:
         return self._convert(self._view.tolist())
 
-    def _convert(self, value: Union[list[int], int]) -> int:
+    def _convert(self, value: list[int] | int) -> int:
         if isinstance(value, list):
             endian = self._format[0]
             fmt = self._format[1]
@@ -75,12 +78,14 @@ class _xmemoryview:
             return list(struct.unpack(f"{endian}{pck}", struct.pack(f"={pck}", *value)))
         return self._struct_to.unpack(self._struct_frm.pack(value))[0]
 
-    def __getitem__(self, idx: Union[int, slice]) -> Union[int, bytes]:
+    def __getitem__(self, idx: int | slice) -> int | bytes:
         value = self._view[idx]
         if isinstance(idx, int):
             return self._convert(value)
         if isinstance(idx, slice):
             return _xmemoryview(self._view[idx], self._format)
+
+        raise TypeError("Invalid index type")
 
     def __setitem__(self, *args, **kwargs) -> None:
         # setitem looks like it's a no-op on cast memoryviews?
@@ -89,7 +94,7 @@ class _xmemoryview:
     def __len__(self) -> int:
         return len(self._view)
 
-    def __eq__(self, other: Union[memoryview, _xmemoryview]):
+    def __eq__(self, other: memoryview | _xmemoryview) -> bool:
         if isinstance(other, _xmemoryview):
             other = other._view
         return self._view.__eq__(other)

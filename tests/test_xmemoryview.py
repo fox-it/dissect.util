@@ -1,7 +1,7 @@
 from dissect.util.xmemoryview import xmemoryview
 
 
-def test_xmemoryview_little():
+def test_xmemoryview_little() -> None:
     # This is mostly a sanity test, since this will be a native memoryview on little endian systems
     buf = bytearray(range(256))
     view = memoryview(buf).cast("I")
@@ -18,7 +18,7 @@ def test_xmemoryview_little():
     assert list(it)[:5] == [0x03020100, 0x07060504, 0x0B0A0908, 0x0F0E0D0C, 0x13121110]
 
 
-def test_xmemoryview_big():
+def test_xmemoryview_big() -> None:
     buf = bytearray(range(256))
     view = memoryview(buf).cast("I")
 

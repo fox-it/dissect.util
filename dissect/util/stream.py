@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import io
 import os
 import sys
 import zlib
 from bisect import bisect_left, bisect_right
 from threading import Lock
-from typing import BinaryIO, Optional, Union
+from typing import BinaryIO
 
 STREAM_BUFFER_SIZE = int(os.getenv("DISSECT_STREAM_BUFFER_SIZE", io.DEFAULT_BUFFER_SIZE))
 
@@ -28,7 +30,7 @@ class AlignedStream(io.RawIOBase):
         align: The alignment size. Read operations are aligned on this boundary. Also determines buffer size.
     """
 
-    def __init__(self, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+    def __init__(self, size: int | None = None, align: int = STREAM_BUFFER_SIZE):
         super().__init__()
         self.size = size
         self.align = align
@@ -107,11 +109,7 @@ class AlignedStream(io.RawIOBase):
 
             if size is not None:
                 remaining = size - self._pos
-
-                if n == -1:
-                    n = remaining
-                else:
-                    n = min(n, remaining)
+                n = remaining if n == -1 else min(n, remaining)
 
             if n == 0 or size is not None and size <= self._pos:
                 return b""
@@ -228,7 +226,7 @@ class RelativeStream(AlignedStream):
         align: The alignment size.
     """
 
-    def __init__(self, fh: BinaryIO, offset: int, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+    def __init__(self, fh: BinaryIO, offset: int, size: int | None = None, align: int = STREAM_BUFFER_SIZE):
         super().__init__(size, align)
         self._fh = fh
         self.offset = offset
@@ -259,7 +257,7 @@ class BufferedStream(RelativeStream):
         align: The alignment size.
     """
 
-    def __init__(self, fh: BinaryIO, offset: int = 0, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+    def __init__(self, fh: BinaryIO, offset: int = 0, size: int | None = None, align: int = STREAM_BUFFER_SIZE):
         super().__init__(fh, offset, size, align)
 
 
@@ -271,7 +269,7 @@ class MappingStream(AlignedStream):
         align: The alignment size.
     """
 
-    def __init__(self, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+    def __init__(self, size: int | None = None, align: int = STREAM_BUFFER_SIZE):
         super().__init__(size, align)
         self._runs: list[tuple[int, int, BinaryIO, int]] = []
 
@@ -360,7 +358,7 @@ class RunlistStream(AlignedStream):
     """
 
     def __init__(
-        self, fh: BinaryIO, runlist: list[tuple[int, int]], size: int, block_size: int, align: Optional[int] = None
+        self, fh: BinaryIO, runlist: list[tuple[int, int]], size: int, block_size: int, align: int | None = None
     ):
         super().__init__(size, align or block_size)
 
@@ -448,13 +446,13 @@ class OverlayStream(AlignedStream):
         align: The alignment size.
     """
 
-    def __init__(self, fh: BinaryIO, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+    def __init__(self, fh: BinaryIO, size: int | None = None, align: int = STREAM_BUFFER_SIZE):
         super().__init__(size, align)
         self._fh = fh
         self.overlays: dict[int, tuple[int, BinaryIO]] = {}
         self._lookup: list[int] = []
 
-    def add(self, offset: int, data: Union[bytes, BinaryIO], size: Optional[int] = None) -> None:
+    def add(self, offset: int, data: bytes | BinaryIO, size: int | None = None) -> None:
         """Add an overlay at the given offset.
 
         Args:
@@ -469,7 +467,7 @@ class OverlayStream(AlignedStream):
             size = data.size if hasattr(data, "size") else data.seek(0, io.SEEK_END)
 
         if not size:
-            return
+            return None
 
         if size < 0:
             raise ValueError("Size must be positive")
@@ -565,7 +563,7 @@ class ZlibStream(AlignedStream):
         size: The size the stream should be.
     """
 
-    def __init__(self, fh: BinaryIO, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE, **kwargs):
+    def __init__(self, fh: BinaryIO, size: int | None = None, align: int = STREAM_BUFFER_SIZE, **kwargs):
         self._fh = fh
 
         self._zlib = None

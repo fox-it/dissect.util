@@ -1,10 +1,12 @@
 # Reference: [MS-XCA]
+from __future__ import annotations
+
 import io
 import struct
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 
-def decompress(src: Union[bytes, BinaryIO]) -> bytes:
+def decompress(src: bytes | BinaryIO) -> bytes:
     """LZXPRESS decompress from a file-like object or bytes.
 
     Args:
@@ -62,7 +64,7 @@ def decompress(src: Union[bytes, BinaryIO]) -> bytes:
                             match_length = struct.unpack("<I", src.read(4))[0]
 
                         if match_length < 15 + 7:
-                            raise Exception("wrong match length")
+                            raise ValueError("wrong match length")
 
                         match_length -= 15 + 7
                     match_length += 15

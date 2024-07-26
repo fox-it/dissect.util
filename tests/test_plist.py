@@ -10,7 +10,7 @@ from dissect.util.plist import NSKeyedArchiver
 
 
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="requires python3.8 or higher")
-def test_plist_nskeyedarchiver():
+def test_plist_nskeyedarchiver() -> None:
     UID = plistlib.UID
 
     data = {
@@ -142,7 +142,7 @@ def test_plist_nskeyedarchiver():
         assert root.String == "TestString"
         assert root.Bytes == b"bytes"
         assert root.Data == b"\x00" * 4
-        assert root.UUID == uuid.UUID("00000000-0000-0000-0000-000000000000")
+        assert root.UUID == uuid.UUID("00000000-0000-0000-0000-000000000000")  # noqa: SIM300
         assert root.Date == datetime.datetime(2021, 12, 10, 13, 55, 52, 84823, tzinfo=datetime.timezone.utc)
         assert root.URL == "http://base/relative"
         assert root.URLBaseless == "relative"
