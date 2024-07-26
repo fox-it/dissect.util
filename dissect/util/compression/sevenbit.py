@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from io import BytesIO
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 
-def compress(src: Union[bytes, BinaryIO]) -> bytes:
+def compress(src: bytes | BinaryIO) -> bytes:
     """Sevenbit compress from a file-like object or bytes.
 
     Args:
@@ -37,7 +39,7 @@ def compress(src: Union[bytes, BinaryIO]) -> bytes:
     return bytes(dst)
 
 
-def decompress(src: Union[bytes, BinaryIO], wide: bool = False) -> bytes:
+def decompress(src: bytes | BinaryIO, wide: bool = False) -> bytes:
     """Sevenbit decompress from a file-like object or bytes.
 
     Args:

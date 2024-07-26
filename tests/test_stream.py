@@ -7,7 +7,7 @@ import pytest
 from dissect.util import stream
 
 
-def test_range_stream():
+def test_range_stream() -> None:
     buf = io.BytesIO(b"\x01" * 10 + b"\x02" * 10 + b"\x03" * 10)
     fh = stream.RangeStream(buf, 5, 15)
 
@@ -41,7 +41,7 @@ def test_range_stream():
     assert fh.tell() == 0
 
 
-def test_relative_stream():
+def test_relative_stream() -> None:
     buf = io.BytesIO(b"\x01" * 10 + b"\x02" * 10 + b"\x03" * 10)
     fh = stream.RelativeStream(buf, 5)
 
@@ -65,7 +65,7 @@ def test_relative_stream():
     assert fh.read() == b"\x01" * 5 + b"\x02" * 10 + b"\x03" * 10
 
 
-def test_buffered_stream():
+def test_buffered_stream() -> None:
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512)
     fh = stream.BufferedStream(buf, size=None)
 
@@ -75,7 +75,7 @@ def test_buffered_stream():
     assert fh.read(1) == b""
 
 
-def test_mapping_stream():
+def test_mapping_stream() -> None:
     buffers = [
         io.BytesIO(b"\x01" * 512),
         io.BytesIO(b"\x02" * 512),
@@ -96,7 +96,7 @@ def test_mapping_stream():
     assert fh.read(1) == b""
 
 
-def test_runlist_stream():
+def test_runlist_stream() -> None:
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512)
     fh = stream.RunlistStream(buf, [(0, 32), (32, 16), (48, 48)], 1536, 16)
 
@@ -112,7 +112,7 @@ def test_runlist_stream():
     assert fh.read(1) == b""
 
 
-def test_aligned_stream_buffer():
+def test_aligned_stream_buffer() -> None:
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512 + b"\x04" * 512)
     fh = stream.RelativeStream(buf, 0, align=512)
 
@@ -130,7 +130,7 @@ def test_aligned_stream_buffer():
     assert fh._buf == b"\x03" * 512
 
 
-def test_overlay_stream():
+def test_overlay_stream() -> None:
     buf = io.BytesIO(b"\x00" * 512 * 8)
     fh = stream.OverlayStream(buf, size=512 * 8, align=512)
 
@@ -139,13 +139,13 @@ def test_overlay_stream():
     fh.seek(0)
 
     # Add a small overlay
-    fh.add(512, b"\xFF" * 4)
+    fh.add(512, b"\xff" * 4)
 
     assert fh.read(512) == b"\x00" * 512
-    assert fh.read(512) == (b"\xFF" * 4) + (b"\x00" * 508)
+    assert fh.read(512) == (b"\xff" * 4) + (b"\x00" * 508)
 
     fh.seek(510)
-    assert fh.read(4) == b"\x00\x00\xFF\xFF"
+    assert fh.read(4) == b"\x00\x00\xff\xff"
 
     # Add a large unaligned overlay
     fh.add(1000, b"\x01" * 1024)
@@ -164,9 +164,9 @@ def test_overlay_stream():
     fh.add(516, b"\x02" * 10)
 
     fh.seek(510)
-    assert fh.read(32) == b"\x00\x00" + (b"\xFF" * 4) + (b"\x02" * 10) + (b"\x00" * 16)
+    assert fh.read(32) == b"\x00\x00" + (b"\xff" * 4) + (b"\x02" * 10) + (b"\x00" * 16)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Overlap with existing overlay: \\(\\(512, 4\\)\\)"):
         fh.add(500, b"\x03" * 100)
 
     fh.add((512 * 8) - 4, b"\x04" * 100)
@@ -174,7 +174,7 @@ def test_overlay_stream():
     assert fh.read(100) == b"\x04" * 4
 
 
-def test_zlib_stream():
+def test_zlib_stream() -> None:
     data = b"\x01" * 8192 + b"\x02" * 8192 + b"\x03" * 8192 + b"\x04" * 8192
     fh = stream.ZlibStream(io.BytesIO(zlib.compress(data)), size=8192 * 4, align=512)
 

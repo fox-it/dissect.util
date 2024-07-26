@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import io
 import struct
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 from dissect.util.exceptions import CorruptDataError
 
@@ -23,8 +25,8 @@ def _get_length(src: BinaryIO, length: int) -> int:
 
 
 def decompress(
-    src: Union[bytes, BinaryIO], max_length: int = -1, return_bytearray: bool = False, return_bytes_read: bool = False
-) -> Union[bytes, tuple[bytes, int]]:
+    src: bytes | BinaryIO, max_length: int = -1, return_bytearray: bool = False, return_bytes_read: bool = False
+) -> bytes | tuple[bytes, int]:
     """LZ4 decompress from a file-like object up to a certain length. Assumes no header.
 
     Args:
@@ -86,5 +88,5 @@ def decompress(
 
     if return_bytes_read:
         return dst, src.tell() - start
-    else:
-        return dst
+
+    return dst
