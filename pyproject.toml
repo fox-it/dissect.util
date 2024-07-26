@@ -31,6 +31,16 @@ homepage = "https://dissect.tools"
 documentation = "https://docs.dissect.tools/en/latest/projects/dissect.util"
 repository = "https://github.com/fox-it/dissect.util"
 
+[project.optional-dependencies]
+lzo = [
+    # There are no Windows PyPy wheels available for python-lzo
+    # So we use a pure python fallback for it.
+    "python-lzo; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
+]
+lz4 = [
+    "lz4",
+]
+
 [project.scripts]
 dump-nskeyedarchiver = "dissect.util.tools.dump_nskeyedarchiver:main"
 
