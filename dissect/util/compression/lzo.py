@@ -2,10 +2,11 @@
 # - https://github.com/FFmpeg/FFmpeg/blob/master/libavutil/lzo.c
 # - https://docs.kernel.org/staging/lzo.html
 # - https://github.com/torvalds/linux/blob/master/lib/lzo/lzo1x_decompress_safe.c
+from __future__ import annotations
 
 import io
 import struct
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 MAX_READ_LENGTH = (1 << 32) - 1000
 
@@ -22,7 +23,7 @@ def _read_length(src: BinaryIO, val: int, mask: int) -> int:
     return length + mask + val
 
 
-def decompress(src: Union[bytes, BinaryIO], header: bool = True, buflen: int = -1) -> bytes:
+def decompress(src: bytes | BinaryIO, header: bool = True, buflen: int = -1) -> bytes:
     """LZO decompress from a file-like object or bytes. Assumes no header.
 
     Arguments are largely compatible with python-lzo API.

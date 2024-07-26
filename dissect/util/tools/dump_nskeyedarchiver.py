@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import argparse
+from typing import Any
 
 from dissect.util.plist import NSKeyedArchiver, NSObject
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("file", type=argparse.FileType("rb"), help="NSKeyedArchiver plist file to dump")
     args = parser.parse_args()
@@ -18,7 +21,7 @@ def main():
         print_object(obj.top)
 
 
-def print_object(obj, indent=0, seen=None):
+def print_object(obj: Any, indent: int = 0, seen: set | None = None) -> None:
     if seen is None:
         seen = set()
 
@@ -50,7 +53,7 @@ def print_object(obj, indent=0, seen=None):
         print(fmt(obj, indent))
 
 
-def fmt(obj, indent):
+def fmt(obj: Any, indent: int) -> str:
     return f"{' ' * (indent * 4)}{obj}"
 
 
