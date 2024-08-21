@@ -4,7 +4,7 @@ from dissect.util import crc32c
 
 
 @pytest.mark.parametrize(
-    "data, value, expected",
+    ("data", "value", "expected"),
     [
         (b"hello, world!", 0, 0xCE8F3C63),
         (b"hello, world!", 0x12345678, 0x30663976),
@@ -22,5 +22,5 @@ from dissect.util import crc32c
         (bytes(reversed(range(32))), 0, 0x113FDB5C),
     ],
 )
-def test_crc32c(data: bytes, value: int, expected: int):
+def test_crc32c(data: bytes, value: int, expected: int) -> None:
     assert crc32c.crc32c(data, value) == expected

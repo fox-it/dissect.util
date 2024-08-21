@@ -1,12 +1,15 @@
 # https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-frs2/8cb5bae9-edf3-4833-9f0a-9d7e24218d3d
 # https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-XCA/[MS-XCA].pdf
+from __future__ import annotations
 
 import io
 import struct
-from collections import namedtuple
-from typing import BinaryIO, Optional, Union
+from typing import BinaryIO, NamedTuple
 
-Symbol = namedtuple("Symbol", ["length", "symbol"])
+
+class Symbol(NamedTuple):
+    length: int
+    symbol: int
 
 
 def _read_16_bit(fh: BinaryIO) -> int:
@@ -16,7 +19,7 @@ def _read_16_bit(fh: BinaryIO) -> int:
 class Node:
     __slots__ = ("symbol", "is_leaf", "children")
 
-    def __init__(self, symbol: Optional[Symbol] = None, is_leaf: bool = False):
+    def __init__(self, symbol: Symbol | None = None, is_leaf: bool = False):
         self.symbol = symbol
         self.is_leaf = is_leaf
         self.children = [None, None]
@@ -120,7 +123,7 @@ class BitString:
         return node.symbol
 
 
-def decompress(src: Union[bytes, BinaryIO]) -> bytes:
+def decompress(src: bytes | BinaryIO) -> bytes:
     """LZXPRESS decompress from a file-like object or bytes.
 
     Decompresses until EOF of the input data.

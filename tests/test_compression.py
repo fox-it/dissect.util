@@ -4,24 +4,16 @@ from io import BytesIO
 
 import pytest
 
-from dissect.util.compression import (
-    lz4,
-    lznt1,
-    lzo,
-    lzxpress,
-    lzxpress_huffman,
-    sevenbit,
-    xz,
-)
+from dissect.util.compression import lz4, lznt1, lzo, lzxpress, lzxpress_huffman, sevenbit, xz
 
 
-def test_lz4_decompress():
+def test_lz4_decompress() -> None:
     assert (
         lz4.decompress(b"\xff\x0cLZ4 compression test string\x1b\x00\xdbPtring") == b"LZ4 compression test string" * 10
     )
 
 
-def test_lznt1_decompress():
+def test_lznt1_decompress() -> None:
     assert lznt1.decompress(
         bytes.fromhex(
             "38b08846232000204720410010a24701a045204400084501507900c045200524"
@@ -34,7 +26,7 @@ def test_lznt1_decompress():
     )
 
 
-def test_lzo_decompress():
+def test_lzo_decompress() -> None:
     assert (
         lzo.decompress(bytes.fromhex("0361626361626320f314000f616263616263616263616263616263616263110000"), False)
         == b"abc" * 100
@@ -220,7 +212,7 @@ def test_lzo_decompress():
     assert lzo.decompress(bytes.fromhex("f0000000041574657374110000")) == b"test"
 
 
-def test_lzxpress_huffman_decompress():
+def test_lzxpress_huffman_decompress() -> None:
     assert (
         lzxpress_huffman.decompress(
             bytes.fromhex(
@@ -239,29 +231,29 @@ def test_lzxpress_huffman_decompress():
     )
 
 
-def test_lzxpress_decompress():
+def test_lzxpress_decompress() -> None:
     assert lzxpress.decompress(bytes.fromhex("ffff ff1f 6162 6317 000f ff26 01")) == b"abc" * 100
 
 
-def test_sevenbit_compress():
+def test_sevenbit_compress() -> None:
     result = sevenbit.compress(b"7-bit compression test string")
     target = bytes.fromhex("b796384d078ddf6db8bc3c9fa7df6e10bd3ca783e67479da7d06")
     assert result == target
 
 
-def test_sevenbit_decompress():
+def test_sevenbit_decompress() -> None:
     result = sevenbit.decompress(bytes.fromhex("b796384d078ddf6db8bc3c9fa7df6e10bd3ca783e67479da7d06"))
     target = b"7-bit compression test string"
     assert result == target
 
 
-def test_sevenbit_decompress_wide():
+def test_sevenbit_decompress_wide() -> None:
     result = sevenbit.decompress(bytes.fromhex("b796384d078ddf6db8bc3c9fa7df6e10bd3ca783e67479da7d06"), wide=True)
     target = "7-bit compression test string".encode("utf-16-le")
     assert result == target
 
 
-def test_xz_repair_checksum():
+def test_xz_repair_checksum() -> None:
     buf = BytesIO(
         bytes.fromhex(
             "fd377a585a000004deadbeef0200210116000000deadbeefe00fff001e5d003a"

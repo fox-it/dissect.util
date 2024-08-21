@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import plistlib
 import uuid
 from collections import UserDict
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.util.ts import cocoatimestamp
 
+if TYPE_CHECKING:
+    from datetime import datetime
+
 
 class NSKeyedArchiver:
-    def __init__(self, fh):
+    def __init__(self, fh: BinaryIO):
         self.plist = plistlib.load(fh)
 
         if not isinstance(self.plist, dict) or not all(
@@ -21,13 +27,16 @@ class NSKeyedArchiver:
         for name, value in self.plist.get("$top", {}).items():
             self.top[name] = self._parse(value)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         return self.top[key]
 
-    def get(self, key, default=None):
+    def __repr__(self) -> str:
+        return f"<NSKeyedArchiver top={self.top}>"
+
+    def get(self, key: str, default: Any | None = None) -> Any:
         return self.top.get(key, default)
 
-    def _parse(self, uid):
+    def _parse(self, uid: Any) -> Any:
         if not isinstance(uid, plistlib.UID):
             return uid
 
@@ -38,7 +47,7 @@ class NSKeyedArchiver:
         self._cache[num] = result
         return result
 
-    def _parse_obj(self, obj):
+    def _parse_obj(self, obj: Any) -> Any:
         if isinstance(obj, dict):
             klass = obj.get("$class")
             if klass:
@@ -55,12 +64,11 @@ class NSKeyedArchiver:
         if isinstance(obj, str):
             return None if obj == "$null" else obj
 
-    def __repr__(self):
-        return f"<NSKeyedArchiver top={self.top}>"
+        return None
 
 
 class NSObject:
-    def __init__(self, nskeyed, obj):
+    def __init__(self, nskeyed: NSKeyedArchiver, obj: dict[str, Any]):
         self.nskeyed = nskeyed
         self.obj = obj
 
@@ -68,20 +76,11 @@ class NSObject:
         self._classname = self._class.get("$classname", "Unknown")
         self._classes = self._class.get("$classes", [])
 
-    def keys(self):
-        return self.obj.keys()
-
-    def get(self, attr, default=None):
-        try:
-            return self[attr]
-        except KeyError:
-            return default
-
-    def __getitem__(self, attr):
+    def __getitem__(self, attr: str) -> Any:
         obj = self.obj[attr]
         return self.nskeyed._parse(obj)
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> Any:
         try:
             return self[attr]
         except KeyError:
@@ -90,45 +89,54 @@ class NSObject:
     def __repr__(self):
         return f"<{self._classname}>"
 
+    def keys(self) -> list[str]:
+        return self.obj.keys()
+
+    def get(self, attr: str, default: Any | None = None) -> Any:
+        try:
+            return self[attr]
+        except KeyError:
+            return default
+
 
 class NSDictionary(UserDict, NSObject):
-    def __init__(self, nskeyed, obj):
+    def __init__(self, nskeyed: NSKeyedArchiver, obj: dict[str, Any]):
         NSObject.__init__(self, nskeyed, obj)
         self.data = {nskeyed._parse(key): obj for key, obj in zip(obj["NS.keys"], obj["NS.objects"])}
 
-    def __getitem__(self, key):
-        return self.nskeyed._parse(self.data[key])
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return NSObject.__repr__(self)
 
+    def __getitem__(self, key: str) -> Any:
+        return self.nskeyed._parse(self.data[key])
 
-def parse_nsarray(nskeyed, obj):
+
+def parse_nsarray(nskeyed: NSKeyedArchiver, obj: dict[str, Any]) -> list[Any]:
     return list(map(nskeyed._parse, obj["NS.objects"]))
 
 
-def parse_nsset(nskeyed, obj):
+def parse_nsset(nskeyed: NSKeyedArchiver, obj: dict[str, Any]) -> list[Any]:
     # Some values are not hashable, so return as list
     return parse_nsarray(nskeyed, obj)
 
 
-def parse_nsdata(nskeyed, obj):
+def parse_nsdata(nskeyed: NSKeyedArchiver, obj: dict[str, Any]) -> Any:
     return obj["NS.data"]
 
 
-def parse_nsdate(nskeyed, obj):
+def parse_nsdate(nskeyed: NSKeyedArchiver, obj: dict[str, Any]) -> datetime:
     return cocoatimestamp(obj["NS.time"])
 
 
-def parse_nsuuid(nskeyed, obj):
+def parse_nsuuid(nskeyed: NSKeyedArchiver, obj: dict[str, Any]) -> uuid.UUID:
     return uuid.UUID(bytes=obj["NS.uuidbytes"])
 
 
-def parse_nsurl(nskeyed, obj):
+def parse_nsurl(nskeyed: NSKeyedArchiver, obj: dict[str, Any]) -> str:
     base = nskeyed._parse(obj["NS.base"])
     relative = nskeyed._parse(obj["NS.relative"])
     if base:
-        return "/".join([base, relative])
+        return f"{base}/{relative}"
     return relative
 
 

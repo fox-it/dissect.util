@@ -1,7 +1,7 @@
 import codecs
 
 
-def error_handler(error):
+def error_handler(error: Exception) -> tuple[str, int]:
     if not isinstance(error, UnicodeDecodeError):
         raise error
 
