@@ -3,7 +3,7 @@ import struct
 from typing import BinaryIO, Union
 
 
-def read_sid(fh: Union[BinaryIO, bytes], endian: str = "<") -> str:
+def read_sid(fh: Union[BinaryIO, bytes], endian: str = "<", swap_last: bool = False) -> str:
     """Read a Windows SID from bytes.
 
     Normally we'd do this with cstruct, but do it with just struct to keep dissect.util dependency-free.
@@ -21,18 +21,26 @@ def read_sid(fh: Union[BinaryIO, bytes], endian: str = "<") -> str:
     Args:
         fh: A file-like object or bytes object to read the SID from.
         endian: Optional endianness for reading the sub authorities.
+        swap_list: Optional flag for swapping the endianess of the _last_ sub authority entry.
     """
     if isinstance(fh, bytes):
         fh = io.BytesIO(fh)
 
-    revision, sub_authority_count, authority = struct.unpack("BB6s", fh.read(8))
+    buf = fh.read(8)
+    revision = buf[0]
+    sub_authority_count = buf[1]
+    authority = int.from_bytes(buf[2:], "big")
 
-    sub_authorities = struct.unpack(f"{endian}{sub_authority_count}I", fh.read(sub_authority_count * 4))
+    sub_authority_buf = bytearray(fh.read(sub_authority_count * 4))
+    if sub_authority_count and swap_last:
+        sub_authority_buf[-4:] = sub_authority_buf[-4:][::-1]
+
+    sub_authorities = struct.unpack(f"{endian}{sub_authority_count}I", sub_authority_buf)
 
     sid_elements = [
         "S",
         f"{revision}",
-        f"{authority[-1]}",
+        f"{authority}",
     ]
     sid_elements.extend(map(str, sub_authorities))
     readable_sid = "-".join(sid_elements)
