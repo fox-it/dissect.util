@@ -9,7 +9,6 @@ from dissect.util import sid
 
 
 def id_fn(val: bytes | str) -> str:
-    print(val)
     if isinstance(val, io.BytesIO):
         val = val.getvalue()
 
