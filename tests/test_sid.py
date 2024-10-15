@@ -1,21 +1,28 @@
 from __future__ import annotations
 
 import io
+from typing import BinaryIO
 
 import pytest
 
 from dissect.util import sid
 
 
-def id_fn(val):
-    if isinstance(val, (str,)):
+def id_fn(val: bytes | str) -> str:
+    if isinstance(val, io.BytesIO):
+        val = val.getvalue()
+
+    if isinstance(val, str):
         return val
-    else:
-        return ""
+
+    if isinstance(val, bytes):
+        return val.hex()
+
+    return ""
 
 
 @pytest.mark.parametrize(
-    "binary_sid, readable_sid, endian, swap_last",
+    ("binary_sid", "readable_sid", "endian", "swap_last"),
     [
         (
             b"\x01\x00\x00\x00\x00\x00\x00\x00",
@@ -62,5 +69,5 @@ def id_fn(val):
     ],
     ids=id_fn,
 )
-def test_read_sid(binary_sid: bytes | io.BinaryIO, endian: str, swap_last: bool, readable_sid: str) -> None:
+def test_read_sid(binary_sid: bytes | BinaryIO, endian: str, swap_last: bool, readable_sid: str) -> None:
     assert readable_sid == sid.read_sid(binary_sid, endian, swap_last)

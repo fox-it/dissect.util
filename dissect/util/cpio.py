@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import stat
 import struct
 import tarfile
@@ -38,7 +40,7 @@ class CpioInfo(tarfile.TarInfo):
     """
 
     @classmethod
-    def fromtarfile(cls, tarfile: tarfile.TarFile) -> tarfile.TarInfo:
+    def fromtarfile(cls, tarfile: tarfile.TarFile) -> CpioInfo:
         if tarfile.format not in (
             FORMAT_CPIO_BIN,
             FORMAT_CPIO_ODC,
@@ -64,7 +66,7 @@ class CpioInfo(tarfile.TarInfo):
         return obj._proc_member(tarfile)
 
     @classmethod
-    def frombuf(cls, buf: bytes, format: int, encoding: str, errors: str) -> tarfile.TarInfo:
+    def frombuf(cls, buf: bytes, format: int, encoding: str, errors: str) -> CpioInfo:
         if format in (FORMAT_CPIO_BIN, FORMAT_CPIO_ODC, FORMAT_CPIO_HPBIN, FORMAT_CPIO_HPODC):
             obj = cls._old_frombuf(buf, format)
         elif format in (FORMAT_CPIO_NEWC, FORMAT_CPIO_CRC):
@@ -78,7 +80,7 @@ class CpioInfo(tarfile.TarInfo):
         return obj
 
     @classmethod
-    def _old_frombuf(cls, buf: bytes, format: int):
+    def _old_frombuf(cls, buf: bytes, format: int) -> CpioInfo:
         if format in (FORMAT_CPIO_BIN, FORMAT_CPIO_HPBIN):
             values = list(struct.unpack("<13H", buf))
             if values[0] == _swap16(CPIO_MAGIC_OLD):
@@ -131,7 +133,7 @@ class CpioInfo(tarfile.TarInfo):
         return obj
 
     @classmethod
-    def _new_frombuf(cls, buf: bytes, format: int):
+    def _new_frombuf(cls, buf: bytes, format: int) -> CpioInfo:
         values = struct.unpack("<6s8s8s8s8s8s8s8s8s8s8s8s8s8s", buf)
         values = [int(values[0], 8)] + [int(v, 16) for v in values[1:]]
         if values[0] not in (CPIO_MAGIC_NEW, CPIO_MAGIC_CRC):
@@ -157,7 +159,7 @@ class CpioInfo(tarfile.TarInfo):
 
         return obj
 
-    def _proc_member(self, tarfile: tarfile.TarFile) -> tarfile.TarInfo:
+    def _proc_member(self, tarfile: tarfile.TarFile) -> CpioInfo | None:
         self.name = tarfile.fileobj.read(self.namesize - 1).decode(tarfile.encoding, tarfile.errors)
         if self.name == "TRAILER!!!":
             # The last entry in a cpio file has the special name ``TRAILER!!!``, indicating the end of the archive
@@ -177,10 +179,11 @@ class CpioInfo(tarfile.TarInfo):
     def _round_word(self, offset: int) -> int:
         if self.format in (FORMAT_CPIO_BIN, FORMAT_CPIO_HPBIN):
             return (offset + 1) & ~0x01
-        elif self.format in (FORMAT_CPIO_NEWC, FORMAT_CPIO_CRC):
+
+        if self.format in (FORMAT_CPIO_NEWC, FORMAT_CPIO_CRC):
             return (offset + 3) & ~0x03
-        else:
-            return offset
+
+        return offset
 
     def issocket(self) -> bool:
         """Return True if it is a socket."""
@@ -211,13 +214,13 @@ def _swap16(value: int) -> int:
     return ((value & 0xFF) << 8) | (value >> 8)
 
 
-def CpioFile(*args, **kwargs):
+def CpioFile(*args, **kwargs) -> tarfile.TarFile:
     """Utility wrapper around ``tarfile.TarFile`` to easily open cpio archives."""
     kwargs.setdefault("format", FORMAT_CPIO_UNKNOWN)
     return tarfile.TarFile(*args, **kwargs, tarinfo=CpioInfo)
 
 
-def open(*args, **kwargs):
+def open(*args, **kwargs) -> tarfile.TarFile:
     """Utility wrapper around ``tarfile.open`` to easily open cpio archives."""
     kwargs.setdefault("format", FORMAT_CPIO_UNKNOWN)
     return tarfile.open(*args, **kwargs, tarinfo=CpioInfo)

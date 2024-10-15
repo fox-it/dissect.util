@@ -1,8 +1,10 @@
 # Reference: https://github.com/google/rekall/blob/master/rekall-core/rekall/plugins/filesystems/lznt1.py
+from __future__ import annotations
+
 import array
 import io
 import struct
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 
 def _get_displacement(offset: int) -> int:
@@ -20,10 +22,10 @@ DISPLACEMENT_TABLE = array.array("B", [_get_displacement(x) for x in range(8192)
 COMPRESSED_MASK = 1 << 15
 SIGNATURE_MASK = 3 << 12
 SIZE_MASK = (1 << 12) - 1
-TAG_MASKS = [(1 << i) for i in range(0, 8)]
+TAG_MASKS = [(1 << i) for i in range(8)]
 
 
-def decompress(src: Union[bytes, BinaryIO]) -> bytes:
+def decompress(src: bytes | BinaryIO) -> bytes:
     """LZNT1 decompress from a file-like object or bytes.
 
     Args:
@@ -87,5 +89,4 @@ def decompress(src: Union[bytes, BinaryIO]) -> bytes:
             data = src.read(hsize + 1)
             dst.write(data)
 
-    result = dst.getvalue()
-    return result
+    return dst.getvalue()

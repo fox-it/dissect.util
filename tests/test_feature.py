@@ -4,23 +4,23 @@ from dissect.util.feature import Feature, FeatureException, feature, feature_ena
 
 
 def test_feature_flags() -> None:
-    def fallback():
+    def fallback() -> bool:
         return False
 
     @feature(Feature.BETA, fallback)
-    def experimental():
+    def experimental() -> bool:
         return True
 
     @feature(Feature.ADVANCED, fallback)
-    def advanced():
+    def advanced() -> bool:
         return True
 
     @feature(Feature.LATEST)
-    def latest():
+    def latest() -> bool:
         return True
 
     @feature("expert")
-    def expert():
+    def expert() -> bool:
         return True
 
     assert experimental() is False

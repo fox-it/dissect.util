@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import io
 import struct
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 
-def read_sid(fh: Union[BinaryIO, bytes], endian: str = "<", swap_last: bool = False) -> str:
+def read_sid(fh: BinaryIO | bytes, endian: str = "<", swap_last: bool = False) -> str:
     """Read a Windows SID from bytes.
 
     Normally we'd do this with cstruct, but do it with just struct to keep dissect.util dependency-free.
@@ -43,6 +45,4 @@ def read_sid(fh: Union[BinaryIO, bytes], endian: str = "<", swap_last: bool = Fa
         f"{authority}",
     ]
     sid_elements.extend(map(str, sub_authorities))
-    readable_sid = "-".join(sid_elements)
-
-    return readable_sid
+    return "-".join(sid_elements)

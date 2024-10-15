@@ -1,16 +1,17 @@
 import gzip
-import os
+from pathlib import Path
+from tarfile import TarFile
 
 import pytest
 
 from dissect.util import cpio
 
 
-def absolute_path(filename):
-    return os.path.join(os.path.dirname(__file__), filename)
+def absolute_path(filename: str) -> Path:
+    return Path(__file__).parent / filename
 
 
-def _verify_archive(archive):
+def _verify_archive(archive: TarFile) -> None:
     assert sorted(archive.getnames()) == sorted(
         [f"dir/file_{i}" for i in range(1, 101)] + ["large-file", "small-file", "symlink-1", "symlink-2"]
     )
@@ -39,7 +40,7 @@ def _verify_archive(archive):
 
 
 @pytest.mark.parametrize(
-    "path,format",
+    ("path", "format"),
     [
         ("data/bin.cpio.gz", cpio.FORMAT_CPIO_BIN),
         ("data/odc.cpio.gz", cpio.FORMAT_CPIO_ODC),
@@ -49,7 +50,7 @@ def _verify_archive(archive):
         ("data/crc.cpio.gz", cpio.FORMAT_CPIO_CRC),
     ],
 )
-def test_cpio_formats(path, format):
+def test_cpio_formats(path: str, format: int) -> None:
     # With explicit format
     archive = cpio.open(absolute_path(path), format=format)
     _verify_archive(archive)
