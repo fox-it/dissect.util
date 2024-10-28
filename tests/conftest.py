@@ -1,4 +1,5 @@
 import importlib.util
+from types import ModuleType
 
 import pytest
 
@@ -15,3 +16,19 @@ def pytest_configure(config: pytest.Config) -> None:
 def pytest_runtest_setup(item: pytest.Item) -> None:
     if not HAS_BENCHMARK and item.get_closest_marker("benchmark") is not None:
         pytest.skip("pytest-benchmark is not installed")
+
+
+@pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
+def lz4(request: pytest.FixtureRequest) -> ModuleType:
+    if request.param:
+        return pytest.importorskip("dissect.util._native", reason="No _native module available").compression.lz4
+
+    return pytest.importorskip("dissect.util.compression.lz4")
+
+
+@pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
+def lzo(request: pytest.FixtureRequest) -> ModuleType:
+    if request.param:
+        return pytest.importorskip("dissect.util._native", reason="No _native module available").compression.lzo
+
+    return pytest.importorskip("dissect.util.compression.lzo")
