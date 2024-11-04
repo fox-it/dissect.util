@@ -139,7 +139,7 @@ class AlignedStream(io.RawIOBase):
             self._fill_buf()
 
             buffer_pos = self._pos - self._pos_align
-            buffer_remaining = max(0, min(align, self._buf_size) - buffer_pos)
+            buffer_remaining = max(0, self._buf_size - buffer_pos)
             read_len = min(n, buffer_remaining)
 
             b[:read_len] = self._buf[buffer_pos : buffer_pos + read_len]
@@ -268,6 +268,7 @@ class RangeStream(AlignedStream):
         super().__init__(size, align)
         self._fh = fh
         self.offset = offset
+        self._has_readinto = hasattr(self._fh, "readinto")
 
     def _seek(self, pos: int, whence: int = io.SEEK_SET) -> int:
         if self.size is None and whence == io.SEEK_END:
@@ -284,11 +285,10 @@ class RangeStream(AlignedStream):
         return self._fh.read(read_length)
 
     def _readinto(self, offset: int, buf: memoryview) -> int:
-        if not hasattr(self._fh, "readinto"):
-            return self._readinto_fallback(offset, buf)
-
-        self._fh.seek(self.offset + offset)
-        return self._fh.readinto(buf)
+        if self._has_readinto:
+            self._fh.seek(self.offset + offset)
+            return self._fh.readinto(buf)
+        return self._readinto_fallback(offset, buf)
 
 
 class RelativeStream(RangeStream):
@@ -308,7 +308,7 @@ class RelativeStream(RangeStream):
         align: The alignment size.
     """
 
-    def __init__(self, fh: BinaryIO, offset: int, size: Optional[int] = None, align: int = STREAM_BUFFER_SIZE):
+    def __init__(self, fh: BinaryIO, offset: int, size: int | None = None, align: int = STREAM_BUFFER_SIZE):
         super().__init__(fh, offset, size, align)
 
 
@@ -440,7 +440,7 @@ class RunlistStream(AlignedStream):
         runlist: list[tuple[int, int]],
         size: int,
         block_size: int,
-        align: Optional[int] = None,
+        align: int | None = None,
     ):
         super().__init__(size, align or block_size)
 
