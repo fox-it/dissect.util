@@ -182,8 +182,8 @@ class AlignedStream(io.RawIOBase):
     def _readinto(self, offset: int, buf: memoryview) -> int:
         """Provide an aligned ``readinto`` implementation for this stream.
 
-        For backwards compatibility, ``AlignedStream`` provides a default ``_readinto`` implementation that
-        falls back on ``_read``. However, subclasses should override this method instead of ``_read``.
+        For backwards compatibility, ``AlignedStream`` provides a default ``_readinto`` implementation, implemented in `_readinto_fallback`, that
+        falls back on ``_read``. However, subclasses should override the ``_readinto`` method instead of ``_readinto_fallback``.
         """
         return self._readinto_fallback(offset, buf)
 
