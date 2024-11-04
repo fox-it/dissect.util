@@ -56,7 +56,11 @@ class AlignedStream(io.RawIOBase):
         return True
 
     def seek(self, pos: int, whence: int = io.SEEK_SET) -> int:
-        """Seek the stream to the specified position."""
+        """Seek the stream to the specified position.
+
+        Returns:
+            The new stream position after seeking.
+        """
         with self._read_lock:
             pos = self._seek(pos, whence)
             self._set_pos(pos)
@@ -95,7 +99,7 @@ class AlignedStream(io.RawIOBase):
 
     def _fill_buf(self) -> None:
         """Fill the alignment buffer if we can."""
-        if self._buf_size or self.size is not None and (self.size <= self._pos or self.size <= self._pos_align):
+        if self._buf_size or (self.size is not None and (self.size <= self._pos or self.size <= self._pos_align)):
             # Don't fill the buffer if:
             # - We already have a buffer
             # - The stream position is at the end (or beyond) the stream size
@@ -104,9 +108,10 @@ class AlignedStream(io.RawIOBase):
         self._buf_size = self._readinto(self._pos_align, self._buf)
 
     def readinto(self, b: bytearray) -> int:
-        """Read bytes into a pre-allocated bytes-like object b.
+        """Read bytes into a pre-allocated bytes-like object ``b``.
 
-        Returns an int representing the number of bytes read (0 for EOF).
+        Returns:
+            The number of bytes read (0 for EOF).
         """
         with self._read_lock:
             return self._readinto_unlocked(b)
@@ -125,13 +130,10 @@ class AlignedStream(io.RawIOBase):
         if size is not None:
             remaining = size - self._pos
 
-            if n == -1:
-                n = remaining
-            else:
-                n = min(n, remaining)
+            n = remaining if n == -1 else min(n, remaining)
 
         # Short path for when it turns out we don't need to read anything
-        if n == 0 or size is not None and size <= self._pos:
+        if n == 0 or (size is not None and size <= self._pos):
             return 0
 
         # Read misaligned start from buffer
@@ -182,8 +184,9 @@ class AlignedStream(io.RawIOBase):
     def _readinto(self, offset: int, buf: memoryview) -> int:
         """Provide an aligned ``readinto`` implementation for this stream.
 
-        For backwards compatibility, ``AlignedStream`` provides a default ``_readinto`` implementation, implemented in `_readinto_fallback`, that
-        falls back on ``_read``. However, subclasses should override the ``_readinto`` method instead of ``_readinto_fallback``.
+        For backwards compatibility, ``AlignedStream`` provides a default ``_readinto`` implementation, implemented
+        in ``_readinto_fallback``, that falls back on ``_read``. However, subclasses should override the ``_readinto``
+        method instead of ``_readinto_fallback``.
         """
         return self._readinto_fallback(offset, buf)
 
@@ -244,7 +247,6 @@ class AlignedStream(io.RawIOBase):
 
     def close(self) -> None:
         """Close the stream. Does nothing by default."""
-        pass
 
 
 class RangeStream(AlignedStream):
@@ -547,19 +549,16 @@ class OverlayStream(AlignedStream):
         self._lookup: list[int] = []
         self._has_readinto = hasattr(self._fh, "readinto")
 
-    def add(self, offset: int, data: bytes | BinaryIO, size: int | None = None) -> None:
+    def add(self, offset: int, data: bytes, size: int | None = None) -> None:
         """Add an overlay at the given offset.
 
         Args:
             offset: The offset in bytes to add an overlay at.
-            data: The bytes or file-like object to overlay
+            data: The data to overlay.
             size: Optional size specification of the overlay, if it can't be inferred.
         """
-        if not hasattr(data, "read"):
-            size = size or len(data)
-            data = io.BytesIO(data)
-        elif size is None:
-            size = data.size if hasattr(data, "size") else data.seek(0, io.SEEK_END)
+        size = size or len(data)
+        data = memoryview(data)
 
         if not size:
             return None
@@ -607,8 +606,9 @@ class OverlayStream(AlignedStream):
                     prev_overlay_remaining = prev_overlay_size - offset_in_prev_overlay
                     prev_overlay_read_size = min(length, prev_overlay_remaining)
 
-                    prev_overlay_data.seek(offset_in_prev_overlay)
-                    buf[:prev_overlay_read_size] = prev_overlay_data.read(prev_overlay_read_size)
+                    buf[:prev_overlay_read_size] = prev_overlay_data[
+                        offset_in_prev_overlay : offset_in_prev_overlay + prev_overlay_read_size
+                    ]
                     n += prev_overlay_read_size
 
                     offset += prev_overlay_read_size
@@ -634,13 +634,12 @@ class OverlayStream(AlignedStream):
 
                     # read remaining from overlay
                     next_overlay_read_size = min(next_overlay_size, length - gap_to_next_overlay)
-                    next_overlay_data.seek(0)
-                    buf[:next_overlay_read_size] = next_overlay_data.read(next_overlay_read_size)
+                    buf[:next_overlay_read_size] = next_overlay_data[:next_overlay_read_size]
                     n += next_overlay_read_size
+                    buf = buf[next_overlay_read_size:]
 
                     offset += next_overlay_read_size + gap_to_next_overlay
                     length -= next_overlay_read_size + gap_to_next_overlay
-                    buf = buf[next_overlay_read_size + gap_to_next_overlay :]
                 else:
                     # Next overlay is too far away, complete read
                     fh.seek(offset)
