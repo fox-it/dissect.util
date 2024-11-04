@@ -125,10 +125,7 @@ class AlignedStream(io.RawIOBase):
         if size is not None:
             remaining = size - self._pos
 
-            if n == -1:
-                n = remaining
-            else:
-                n = min(n, remaining)
+            n = remaining if n == -1 else min(n, remaining)
 
         # Short path for when it turns out we don't need to read anything
         if n == 0 or size is not None and size <= self._pos:
@@ -182,8 +179,9 @@ class AlignedStream(io.RawIOBase):
     def _readinto(self, offset: int, buf: memoryview) -> int:
         """Provide an aligned ``readinto`` implementation for this stream.
 
-        For backwards compatibility, ``AlignedStream`` provides a default ``_readinto`` implementation, implemented in `_readinto_fallback`, that
-        falls back on ``_read``. However, subclasses should override the ``_readinto`` method instead of ``_readinto_fallback``.
+        For backwards compatibility, ``AlignedStream`` provides a default ``_readinto`` implementation, implemented
+        in ``_readinto_fallback``, that falls back on ``_read``. However, subclasses should override the ``_readinto``
+        method instead of ``_readinto_fallback``.
         """
         return self._readinto_fallback(offset, buf)
 
@@ -244,7 +242,6 @@ class AlignedStream(io.RawIOBase):
 
     def close(self) -> None:
         """Close the stream. Does nothing by default."""
-        pass
 
 
 class RangeStream(AlignedStream):
