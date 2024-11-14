@@ -96,6 +96,20 @@ def test_mapping_stream() -> None:
     assert fh.read(1) == b""
 
 
+def test_mapping_stream_same_offset() -> None:
+    buffers = [
+        io.BytesIO(b"\x01" * 512),
+        io.BytesIO(b"\x02" * 512),
+    ]
+    fh = stream.MappingStream()
+    # Add them in different orders to test if sorting works
+    fh.add(0, 1024, buffers[0])
+    fh.add(0, 1024, buffers[1])  # This should not raise an exception in add()
+
+    assert fh._runs[0][2] == buffers[0]
+    assert fh._runs[1][2] == buffers[1]
+
+
 def test_runlist_stream() -> None:
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512)
     fh = stream.RunlistStream(buf, [(0, 32), (32, 16), (48, 48)], 1536, 16)
