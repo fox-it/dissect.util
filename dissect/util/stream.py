@@ -281,9 +281,11 @@ class MappingStream(AlignedStream):
             size: The size that this mapped fh spans in the stream.
             fh: The file-like object to map.
             file_offset: The offset in the fh to start from.
+
+        Note that there is no check on overlapping offsets and/or sizes.
         """
         self._runs.append((offset, size, fh, file_offset))
-        self._runs = sorted(self._runs)
+        self._runs = sorted(self._runs, key=lambda run: run[0])
         self._buf = None
         self.size = self._runs[-1][0] + self._runs[-1][1]
 
