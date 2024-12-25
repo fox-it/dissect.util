@@ -1,6 +1,16 @@
+from __future__ import annotations
+
+import importlib.util
+from typing import TYPE_CHECKING
+
 import pytest
 
 from dissect.util import crc32c
+
+if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
+
+HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
 
 @pytest.mark.parametrize(
@@ -24,3 +34,8 @@ from dissect.util import crc32c
 )
 def test_crc32c(data: bytes, value: int, expected: int) -> None:
     assert crc32c.crc32c(data, value) == expected
+
+
+@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
+def test_crc32c_benchmark(benchmark: BenchmarkFixture) -> None:
+    benchmark(crc32c.crc32c, b"hello, world!", 0)
