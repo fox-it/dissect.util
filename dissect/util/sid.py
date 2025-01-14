@@ -28,7 +28,9 @@ def read_sid(fh: BinaryIO | bytes, endian: str = "<", swap_last: bool = False) -
     if isinstance(fh, bytes):
         fh = io.BytesIO(fh)
 
-    buf = fh.read(8)
+    if len(buf := fh.read(8)) != 8:
+        return ""
+
     revision = buf[0]
     sub_authority_count = buf[1]
     authority = int.from_bytes(buf[2:], "big")
