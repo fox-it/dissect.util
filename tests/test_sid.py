@@ -74,7 +74,7 @@ def id_fn(val: bytes | str) -> str:
         ),
         (
             b"",
-            None,
+            "",
             "<",
             False,
         ),
