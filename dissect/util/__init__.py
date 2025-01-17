@@ -11,7 +11,7 @@ __all__ = [
     "lz4",
     "lznt1",
     "lzo",
-    "lzxpress_huffman",
     "lzxpress",
+    "lzxpress_huffman",
     "sevenbit",
 ]

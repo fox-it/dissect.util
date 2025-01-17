@@ -17,7 +17,7 @@ def _read_16_bit(fh: BinaryIO) -> int:
 
 
 class Node:
-    __slots__ = ("symbol", "is_leaf", "children")
+    __slots__ = ("children", "is_leaf", "symbol")
 
     def __init__(self, symbol: Symbol | None = None, is_leaf: bool = False):
         self.symbol = symbol
