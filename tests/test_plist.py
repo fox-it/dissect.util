@@ -2,11 +2,13 @@ import datetime
 import plistlib
 import sys
 import uuid
+from io import BytesIO
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
 
-from dissect.util.plist import NSKeyedArchiver
+from dissect.util.plist import NSKeyedArchiver, NSObject
 
 
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="requires python3.8 or higher")
@@ -132,10 +134,10 @@ def test_plist_nskeyedarchiver() -> None:
         ],
     }
     with patch("plistlib.load", return_value=data):
-        obj = NSKeyedArchiver(None)
+        obj = NSKeyedArchiver(BytesIO(b""))
         assert "root" in obj.top
 
-        root = obj["root"]
+        root = cast(NSObject, obj["root"])
         assert root._classname == "TestObject"
         assert root.Null is None
         assert root.Integer == 1337
@@ -147,4 +149,4 @@ def test_plist_nskeyedarchiver() -> None:
         assert root.URL == "http://base/relative"
         assert root.URLBaseless == "relative"
         assert root.Array == root.Set == [1, "TestString"]
-        assert list(root.Dict.items()) == [("DictKey", "TestString")]
+        assert list(cast(dict[Any, Any], root.Dict).items()) == [("DictKey", "TestString")]

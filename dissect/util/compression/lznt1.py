@@ -25,7 +25,7 @@ SIZE_MASK = (1 << 12) - 1
 TAG_MASKS = [(1 << i) for i in range(8)]
 
 
-def decompress(src: bytes | BinaryIO) -> bytes:
+def decompress(src: bytes | bytearray | memoryview | BinaryIO) -> bytes:
     """LZNT1 decompress from a file-like object or bytes.
 
     Args:
@@ -34,7 +34,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, (bytes, bytearray, memoryview)):
         src = io.BytesIO(src)
 
     offset = src.tell()

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import struct
-from typing import BinaryIO
+from typing import BinaryIO, cast
 
 from dissect.util.exceptions import CorruptDataError
 
@@ -25,12 +25,12 @@ def _get_length(src: BinaryIO, length: int) -> int:
 
 
 def decompress(
-    src: bytes | BinaryIO,
+    src: bytes | bytearray | memoryview | BinaryIO,
     uncompressed_size: int = -1,
     max_length: int = -1,
     return_bytearray: bool = False,
     return_bytes_read: bool = False,
-) -> bytes | tuple[bytes, int]:
+) -> bytes | bytearray | tuple[bytes | bytearray, int]:
     """LZ4 decompress from a file-like object up to a certain length. Assumes no header.
 
     Args:
@@ -44,7 +44,7 @@ def decompress(
     Returns:
         The decompressed data or a tuple of the decompressed data and the amount of bytes read.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, (bytes, bytearray, memoryview)):
         src = io.BytesIO(src)
 
     dst = bytearray()
@@ -78,7 +78,7 @@ def decompress(
         if len(read_buf) != 2:
             raise CorruptDataError("Premature EOF")
 
-        (offset,) = struct.unpack("<H", read_buf)
+        (offset,) = cast(tuple[int], struct.unpack("<H", read_buf))
 
         if offset == 0:
             raise CorruptDataError("Offset can't be 0")

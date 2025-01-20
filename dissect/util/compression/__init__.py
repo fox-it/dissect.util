@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from dissect.util.compression import lz4 as lz4_python
 from dissect.util.compression import lzo as lzo_python
 
@@ -16,8 +18,8 @@ from dissect.util.compression import lzo as lzo_python
 # Note that the pure Python implementation is not a full replacement of the
 # native lz4 Python package: only the decompress() function is implemented.
 try:
-    import lz4.block as lz4
-    import lz4.block as lz4_native
+    import lz4.block as lz4  # type: ignore
+    import lz4.block as lz4_native  # type: ignore
 except ImportError:
     lz4 = lz4_python
     lz4_native = None
@@ -37,11 +39,18 @@ except ImportError:
 # Note that the pure Python implementation is not a full replacement of the
 # native lzo Python package: only the decompress() function is implemented.
 try:
-    import lzo
-    import lzo as lzo_native
+    import lzo  # type: ignore
+    import lzo as lzo_native  # type: ignore
 except ImportError:
     lzo = lzo_python
     lzo_native = None
+
+
+from dissect.util.compression import lznt1, lzxpress, lzxpress_huffman, sevenbit
+
+if TYPE_CHECKING:
+    lzo = lzo_python
+    lz4 = lz4_python
 
 __all__ = [
     "lz4",

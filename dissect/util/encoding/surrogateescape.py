@@ -5,7 +5,7 @@ def error_handler(error: Exception) -> tuple[str, int]:
     if not isinstance(error, UnicodeDecodeError):
         raise error
 
-    result = []
+    result: list[str] = []
     for i in range(error.start, error.end):
         byte = error.object[i]
         if byte < 128:
