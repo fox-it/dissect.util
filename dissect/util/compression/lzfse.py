@@ -398,7 +398,7 @@ def _decode_lmd(
     return bytes(dst)
 
 
-def decompress(src: bytes | BinaryIO) -> bytes:
+def decompress(src: bytes | bytearray | memoryview | BinaryIO) -> bytes:
     """LZFSE decompress from a file-like object or bytes.
 
     Decompresses until EOF or EOS of the input data.
@@ -409,7 +409,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, bytes | bytearray | memoryview):
         src = io.BytesIO(src)
 
     dst = bytearray()

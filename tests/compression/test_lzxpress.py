@@ -8,7 +8,7 @@ import pytest
 from dissect.util.compression import lzxpress
 
 if TYPE_CHECKING:
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore
 
 
 @pytest.mark.parametrize(

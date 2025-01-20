@@ -11,7 +11,7 @@ from typing import BinaryIO
 _H = struct.Struct("<H")
 
 
-def decompress(src: bytes | BinaryIO) -> bytes:
+def decompress(src: bytes | bytearray | memoryview | BinaryIO) -> bytes:
     """LZBITMAP decompress from a file-like object or bytes.
 
     Decompresses until EOF or EOS of the input data.
@@ -22,7 +22,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, bytes | bytearray | memoryview):
         src = io.BytesIO(src)
 
     if src.read(4) != b"ZBM\x09":
@@ -54,7 +54,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             buf = memoryview(src.read(compressed_size))
 
             # Build the bitmap/token map
-            token_map = []
+            token_map: list[tuple[int | None, int]] = []
             bits = int.from_bytes(buf[-17:], "little")
             for i in range(0xF):
                 if i < 3:
@@ -97,7 +97,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
 
                 for _ in range(repeat):
                     bitmap, token = token_map[idx]
-                    if idx < 3:
+                    if bitmap is None:  # idx < 3, but this makes the type checker happy
                         # Index 0, 1, 2 are special and indicate we need to read a bitmap from the bitmap region
                         bitmap = buf[bitmap_offset]
                         bitmap_offset += 1

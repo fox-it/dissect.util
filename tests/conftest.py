@@ -1,5 +1,6 @@
 import importlib.util
 from types import ModuleType
+from typing import cast
 
 import pytest
 
@@ -26,13 +27,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def _native_or_python(module: ModuleType, name: str, request: pytest.FixtureRequest) -> ModuleType:
     if request.param:
-        if not (module := getattr(module, f"{name}_native", None)):
+        if not (module := cast("ModuleType", getattr(module, f"{name}_native", None))):
             (pytest.fail if request.config.getoption("--force-native") else pytest.skip)(
                 "_native module is unavailable"
             )
 
         return module
-    return getattr(module, f"{name}_python", None)
+    return getattr(module, f"{name}_python")
 
 
 @pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])

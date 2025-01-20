@@ -8,7 +8,7 @@ import pytest
 if TYPE_CHECKING:
     from types import ModuleType
 
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore
 
 
 @pytest.mark.parametrize(

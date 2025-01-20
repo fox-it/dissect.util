@@ -48,7 +48,7 @@ class SearchFilter:
         self.query: str = query
 
         self.children: list[SearchFilter] = []
-        self.operator: LogicalOperator | ComparisonOperator | None = None
+        self.operator: LogicalOperator | ComparisonOperator = None
         self.attribute: str | None = None
         self.value: str | None = None
         self._extended_rule: str | None = None

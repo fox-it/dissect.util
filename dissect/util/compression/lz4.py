@@ -25,10 +25,10 @@ def _get_length(src: BinaryIO, length: int) -> int:
 
 
 def decompress(
-    src: bytes | BinaryIO,
+    src: bytes | bytearray | memoryview | BinaryIO,
     uncompressed_size: int = -1,
     return_bytearray: bool = False,
-) -> bytes | tuple[bytes, int]:
+) -> bytes | bytearray | tuple[bytes | bytearray, int]:
     """LZ4 decompress from a file-like object or bytes up to a certain length. Assumes no header.
 
     Args:
@@ -39,7 +39,7 @@ def decompress(
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, bytes | bytearray | memoryview):
         src = io.BytesIO(src)
 
     dst = bytearray()

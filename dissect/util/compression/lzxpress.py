@@ -6,7 +6,7 @@ import struct
 from typing import BinaryIO
 
 
-def decompress(src: bytes | BinaryIO) -> bytes:
+def decompress(src: bytes | bytearray | memoryview | BinaryIO) -> bytes:
     """LZXPRESS decompress from a file-like object or bytes.
 
     Args:
@@ -15,7 +15,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, bytes | bytearray | memoryview):
         src = io.BytesIO(src)
 
     offset = src.tell()

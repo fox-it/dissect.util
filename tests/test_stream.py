@@ -10,7 +10,7 @@ import pytest
 from dissect.util import stream
 
 if TYPE_CHECKING:
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore
 
 
 def test_range_stream() -> None:
