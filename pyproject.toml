@@ -44,6 +44,12 @@ lz4 = [
 [project.scripts]
 dump-nskeyedarchiver = "dissect.util.tools.dump_nskeyedarchiver:main"
 
+[tool.pyright]
+pythonVersion = "3.9"
+pythonPlatform = "All"
+typeCheckingMode = "strict"
+reportPrivateUsage = false
+
 [tool.ruff]
 line-length = 120
 required-version = ">=0.9.0"

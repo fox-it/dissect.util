@@ -8,7 +8,7 @@ import pytest
 from dissect.util import sid
 
 
-def id_fn(val: bytes | str) -> str:
+def id_fn(val: bytes | str | None) -> str:
     if isinstance(val, io.BytesIO):
         val = val.getvalue()
 

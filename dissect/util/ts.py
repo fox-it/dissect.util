@@ -3,6 +3,7 @@ from __future__ import annotations
 import struct
 import sys
 from datetime import datetime, timedelta, timezone, tzinfo
+from typing import TypedDict
 
 if sys.platform in ("win32", "emscripten"):
     _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -288,6 +289,11 @@ def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime
     )
 
 
+class _TZInfo(TypedDict):
+    name: str
+    offset: int
+
+
 class UTC(tzinfo):
     """tzinfo class for timezones that have a fixed-offset from UTC
 
@@ -295,17 +301,17 @@ class UTC(tzinfo):
         tz_dict: Dictionary of ``{"name": "timezone name", "offset": offset_from_UTC_in_minutes}``
     """
 
-    def __init__(self, tz_dict: dict[str, str | int]):
+    def __init__(self, tz_dict: _TZInfo):
         # offset should be in minutes
         self.name = tz_dict["name"]
         self.offset = timedelta(minutes=tz_dict["offset"])
 
-    def utcoffset(self, dt: datetime) -> timedelta:
+    def utcoffset(self, dt: datetime | None) -> timedelta:
         return self.offset
 
-    def tzname(self, dt: datetime) -> str:
+    def tzname(self, dt: datetime | None) -> str:
         return self.name
 
-    def dst(self, dt: datetime) -> timedelta:
+    def dst(self, dt: datetime | None) -> timedelta:
         # do not account for daylight saving
         return timedelta(0)

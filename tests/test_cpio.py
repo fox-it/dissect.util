@@ -20,13 +20,15 @@ def _verify_archive(archive: TarFile) -> None:
     assert small_file.name == "small-file"
     assert small_file.size == 9
     assert small_file.isfile()
-    assert archive.extractfile(small_file).read() == b"contents\n"
+    assert (fh := archive.extractfile(small_file))
+    assert fh.read() == b"contents\n"
 
     large_file = archive.getmember("large-file")
     assert large_file.name == "large-file"
     assert large_file.size == 0x3FC000
     assert small_file.isfile()
-    assert archive.extractfile(large_file).read() == b"".join([bytes([i] * 4096) for i in range(255)]) * 4
+    assert (fh := archive.extractfile(large_file))
+    assert fh.read() == b"".join([bytes([i] * 4096) for i in range(255)]) * 4
 
     symlink_1 = archive.getmember("symlink-1")
     assert symlink_1.issym()

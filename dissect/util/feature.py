@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import os
 from enum import Enum
-from typing import Callable, NoReturn
+from typing import Any, Callable, NoReturn
 
 
 # Register feature flags in a central place to avoid chaos
@@ -45,7 +45,7 @@ def feature_enabled(feature: Feature) -> bool:
     return feature in feature_flags()
 
 
-def feature(flag: Feature, alternative: Callable | None = None) -> Callable:
+def feature(flag: Feature | str, alternative: Callable[..., Any] | None = None) -> Callable[..., Any]:
     """Feature flag decorator allowing you to guard a function behind a feature flag.
 
     Usage::
@@ -59,7 +59,7 @@ def feature(flag: Feature, alternative: Callable | None = None) -> Callable:
 
     if alternative is None:
 
-        def alternative() -> NoReturn:
+        def default_alternative() -> NoReturn:
             raise FeatureException(
                 "\n".join(
                     [
@@ -70,7 +70,9 @@ def feature(flag: Feature, alternative: Callable | None = None) -> Callable:
                 )
             )
 
-    def decorator(func: Callable) -> Callable:
+        alternative = default_alternative
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         return func if feature_enabled(flag) else alternative
 
     return decorator

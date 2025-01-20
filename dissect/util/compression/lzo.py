@@ -23,7 +23,7 @@ def _read_length(src: BinaryIO, val: int, mask: int) -> int:
     return length + mask + val
 
 
-def decompress(src: bytes | BinaryIO, header: bool = True, buflen: int = -1) -> bytes:
+def decompress(src: bytes | bytearray | memoryview | BinaryIO, header: bool = True, buflen: int = -1) -> bytes:
     """LZO decompress from a file-like object or bytes. Assumes no header.
 
     Arguments are largely compatible with python-lzo API.
@@ -36,7 +36,7 @@ def decompress(src: bytes | BinaryIO, header: bool = True, buflen: int = -1) -> 
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, (bytes, bytearray, memoryview)):
         src = io.BytesIO(src)
 
     dst = bytearray()

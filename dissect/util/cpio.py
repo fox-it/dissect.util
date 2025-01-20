@@ -3,8 +3,8 @@ from __future__ import annotations
 import stat
 import struct
 import tarfile
-from tarfile import InvalidHeaderError
-from typing import BinaryIO
+from tarfile import EmptyHeaderError, InvalidHeaderError  # type: ignore
+from typing import Any, BinaryIO, cast
 
 FORMAT_CPIO_BIN = 10
 FORMAT_CPIO_ODC = 11
@@ -39,8 +39,20 @@ class CpioInfo(tarfile.TarInfo):
 
     """
 
+    format: int
+    _mode: int
+    magic: int
+    ino: int
+    nlink: int
+    rdevmajor: int
+    rdevminor: int
+    namesize: int
+
     @classmethod
     def fromtarfile(cls, tarfile: tarfile.TarFile) -> CpioInfo:
+        if not tarfile.fileobj:
+            raise RuntimeError("Invalid tarfile state")
+
         if tarfile.format not in (
             FORMAT_CPIO_BIN,
             FORMAT_CPIO_ODC,
@@ -49,7 +61,7 @@ class CpioInfo(tarfile.TarInfo):
             FORMAT_CPIO_HPBIN,
             FORMAT_CPIO_HPODC,
         ):
-            tarfile.format = detect_header(tarfile.fileobj)
+            tarfile.format = detect_header(cast(BinaryIO, tarfile.fileobj))
 
         if tarfile.format in (FORMAT_CPIO_BIN, FORMAT_CPIO_HPBIN):
             buf = tarfile.fileobj.read(26)
@@ -58,29 +70,33 @@ class CpioInfo(tarfile.TarInfo):
         elif tarfile.format in (FORMAT_CPIO_NEWC, FORMAT_CPIO_CRC):
             buf = tarfile.fileobj.read(110)
         else:
-            raise InvalidHeaderError("Unknown cpio type")
+            raise InvalidHeaderError("Unknown cpio type")  # type: ignore
 
-        obj = cls.frombuf(buf, tarfile.format, tarfile.encoding, tarfile.errors)
+        obj = cls.frombuf(buf, tarfile.encoding, tarfile.errors, format=tarfile.format)
         obj.format = tarfile.format
         obj.offset = tarfile.fileobj.tell() - len(buf)
         return obj._proc_member(tarfile)
 
     @classmethod
-    def frombuf(cls, buf: bytes, format: int, encoding: str, errors: str) -> CpioInfo:
+    def frombuf(
+        cls, buf: bytes | bytearray, encoding: str | None, errors: str, format: int = FORMAT_CPIO_UNKNOWN
+    ) -> CpioInfo:
         if format in (FORMAT_CPIO_BIN, FORMAT_CPIO_ODC, FORMAT_CPIO_HPBIN, FORMAT_CPIO_HPODC):
             obj = cls._old_frombuf(buf, format)
         elif format in (FORMAT_CPIO_NEWC, FORMAT_CPIO_CRC):
             obj = cls._new_frombuf(buf, format)
+        else:
+            raise InvalidHeaderError("Unknown cpio type")
 
         # Common postprocessing
         ftype = stat.S_IFMT(obj._mode)
-        obj.type = TYPE_MAP.get(ftype, ftype)
+        obj.type = TYPE_MAP.get(ftype, tarfile.REGTYPE)
         obj.mode = stat.S_IMODE(obj._mode)
 
         return obj
 
     @classmethod
-    def _old_frombuf(cls, buf: bytes, format: int) -> CpioInfo:
+    def _old_frombuf(cls, buf: bytes | bytearray, format: int) -> CpioInfo:
         if format in (FORMAT_CPIO_BIN, FORMAT_CPIO_HPBIN):
             values = list(struct.unpack("<13H", buf))
             if values[0] == _swap16(CPIO_MAGIC_OLD):
@@ -94,7 +110,7 @@ class CpioInfo(tarfile.TarInfo):
             values = [int(v, 8) for v in struct.unpack("<6s6s6s6s6s6s6s6s11s6s11s", buf)]
 
         if values[0] != CPIO_MAGIC_OLD:
-            raise InvalidHeaderError(f"Invalid (old) ASCII/binary cpio header magic: {oct(values[0])}")
+            raise tarfile.InvalidHeaderError(f"Invalid (old) ASCII/binary cpio header magic: {oct(values[0])}")  # type: ignore
 
         obj = cls()
         obj.devmajor = values[1] >> 8
@@ -133,11 +149,11 @@ class CpioInfo(tarfile.TarInfo):
         return obj
 
     @classmethod
-    def _new_frombuf(cls, buf: bytes, format: int) -> CpioInfo:
+    def _new_frombuf(cls, buf: bytes | bytearray, format: int) -> CpioInfo:
         values = struct.unpack("<6s8s8s8s8s8s8s8s8s8s8s8s8s8s", buf)
         values = [int(values[0], 8)] + [int(v, 16) for v in values[1:]]
         if values[0] not in (CPIO_MAGIC_NEW, CPIO_MAGIC_CRC):
-            raise InvalidHeaderError(f"Invalid (new) ASCII cpio header magic: {oct(values[0])}")
+            raise InvalidHeaderError(f"Invalid (new) ASCII cpio header magic: {oct(values[0])}")  # type: ignore
 
         obj = cls()
         obj._mode = values[2]
@@ -159,11 +175,14 @@ class CpioInfo(tarfile.TarInfo):
 
         return obj
 
-    def _proc_member(self, tarfile: tarfile.TarFile) -> CpioInfo | None:
-        self.name = tarfile.fileobj.read(self.namesize - 1).decode(tarfile.encoding, tarfile.errors)
+    def _proc_member(self, tarfile: tarfile.TarFile) -> CpioInfo:
+        if not tarfile.fileobj:
+            raise RuntimeError("Invalid tarfile state")
+
+        self.name = tarfile.fileobj.read(self.namesize - 1).decode(tarfile.encoding or "utf-8", tarfile.errors)
         if self.name == "TRAILER!!!":
             # The last entry in a cpio file has the special name ``TRAILER!!!``, indicating the end of the archive
-            return None
+            raise EmptyHeaderError("End of cpio archive")  # type: ignore
 
         offset = tarfile.fileobj.tell() + 1
         self.offset_data = self._round_word(offset)
@@ -171,7 +190,7 @@ class CpioInfo(tarfile.TarInfo):
 
         if self.issym():
             tarfile.fileobj.seek(self.offset_data)
-            self.linkname = tarfile.fileobj.read(self.size).decode(tarfile.encoding, tarfile.errors)
+            self.linkname = tarfile.fileobj.read(self.size).decode(tarfile.encoding or "utf-8", tarfile.errors)
             self.size = 0
 
         return self
@@ -187,7 +206,7 @@ class CpioInfo(tarfile.TarInfo):
 
     def issocket(self) -> bool:
         """Return True if it is a socket."""
-        return self.type == stat.S_IFSOCK
+        return self._mode == stat.S_IFSOCK
 
 
 def detect_header(fh: BinaryIO) -> int:
@@ -214,13 +233,13 @@ def _swap16(value: int) -> int:
     return ((value & 0xFF) << 8) | (value >> 8)
 
 
-def CpioFile(*args, **kwargs) -> tarfile.TarFile:
+def CpioFile(*args: Any, **kwargs: Any) -> tarfile.TarFile:
     """Utility wrapper around ``tarfile.TarFile`` to easily open cpio archives."""
     kwargs.setdefault("format", FORMAT_CPIO_UNKNOWN)
     return tarfile.TarFile(*args, **kwargs, tarinfo=CpioInfo)
 
 
-def open(*args, **kwargs) -> tarfile.TarFile:
+def open(*args: Any, **kwargs: Any) -> tarfile.TarFile:
     """Utility wrapper around ``tarfile.open`` to easily open cpio archives."""
     kwargs.setdefault("format", FORMAT_CPIO_UNKNOWN)
     return tarfile.open(*args, **kwargs, tarinfo=CpioInfo)

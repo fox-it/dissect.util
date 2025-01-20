@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import Any
+from typing import Any, cast
 
 from dissect.util.plist import NSKeyedArchiver, NSObject
 
@@ -15,13 +15,13 @@ def main() -> None:
         try:
             obj = NSKeyedArchiver(fh)
         except ValueError as e:
-            parser.exit(str(e))
+            parser.exit(1, str(e))
 
         print(obj)
         print_object(obj.top)
 
 
-def print_object(obj: Any, indent: int = 0, seen: set | None = None) -> None:
+def print_object(obj: Any, indent: int = 0, seen: set[Any] | None = None) -> None:
     if seen is None:
         seen = set()
 
@@ -33,7 +33,7 @@ def print_object(obj: Any, indent: int = 0, seen: set | None = None) -> None:
         pass
 
     if isinstance(obj, list):
-        for i, v in enumerate(obj):
+        for i, v in enumerate(cast(list[Any], obj)):
             print(fmt(f"[{i}]:", indent))
             print_object(v, indent + 1, seen)
 
@@ -45,7 +45,7 @@ def print_object(obj: Any, indent: int = 0, seen: set | None = None) -> None:
             except TypeError:
                 pass
 
-        for k in sorted(obj.keys()):
+        for k in sorted(cast(dict[Any, Any], obj).keys()):
             print(fmt(f"{k}:", indent + 1))
             print_object(obj[k], indent + 2, seen)
 

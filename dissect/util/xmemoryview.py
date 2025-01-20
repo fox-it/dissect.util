@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import struct
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast, overload
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-def xmemoryview(view: bytes, format: str) -> memoryview | _xmemoryview:
+def xmemoryview(buf: bytes | bytearray | memoryview, format: str) -> memoryview | _xmemoryview:
     """Cast a memoryview to the specified format, including endianness.
 
     The regular ``memoryview.cast()`` method only supports host endianness. While that should be fine 99% of the time
@@ -20,7 +20,7 @@ def xmemoryview(view: bytes, format: str) -> memoryview | _xmemoryview:
     See ``memoryview.cast()`` for more details on what that actually does.
 
     Args:
-        view: The bytes object or memoryview to cast.
+        buf: The bytes object or memoryview to cast.
         format: The format to cast to in ``struct`` format syntax.
 
     Raises:
@@ -30,14 +30,12 @@ def xmemoryview(view: bytes, format: str) -> memoryview | _xmemoryview:
     if len(format) != 2:
         raise ValueError("Invalid format specification")
 
-    if isinstance(view, (bytes, bytearray)):
-        view = memoryview(view)
-
-    if not isinstance(view, memoryview):
+    view = memoryview(buf) if isinstance(buf, (bytes, bytearray)) else buf
+    if not isinstance(view, memoryview):  # type: ignore
         raise TypeError("view must be a memoryview, bytes or bytearray object")
 
     endian = format[0]
-    view = view.cast(format[1])
+    view = cast(memoryview, view.cast(format[1]))  # type: ignore
 
     if (
         endian in ("@", "=")
@@ -68,33 +66,40 @@ class _xmemoryview:
         self._struct_to = struct.Struct(format)
 
     def tolist(self) -> list[int]:
-        return self._convert(self._view.tolist())
+        return self._convert_list(self._view.tolist())
 
-    def _convert(self, value: list[int] | int) -> int:
-        if isinstance(value, list):
-            endian = self._format[0]
-            fmt = self._format[1]
-            pck = f"{len(value)}{fmt}"
-            return list(struct.unpack(f"{endian}{pck}", struct.pack(f"={pck}", *value)))
+    def _convert(self, value: int) -> int:
         return self._struct_to.unpack(self._struct_frm.pack(value))[0]
 
-    def __getitem__(self, idx: int | slice) -> int | bytes:
+    def _convert_list(self, value: list[int]) -> list[int]:
+        endian = self._format[0]
+        fmt = self._format[1]
+        pck = f"{len(value)}{fmt}"
+        return list(struct.unpack(f"{endian}{pck}", struct.pack(f"={pck}", *value)))
+
+    @overload
+    def __getitem__(self, idx: int) -> int: ...
+
+    @overload
+    def __getitem__(self, idx: slice) -> _xmemoryview: ...
+
+    def __getitem__(self, idx: int | slice) -> int | _xmemoryview:
         value = self._view[idx]
-        if isinstance(idx, int):
+        if isinstance(value, int):
             return self._convert(value)
-        if isinstance(idx, slice):
-            return _xmemoryview(self._view[idx], self._format)
+        if isinstance(value, memoryview):  # type: ignore
+            return _xmemoryview(value, self._format)
 
         raise TypeError("Invalid index type")
 
-    def __setitem__(self, *args, **kwargs) -> None:
+    def __setitem__(self, *args: Any, **kwargs: Any) -> None:
         # setitem looks like it's a no-op on cast memoryviews?
         pass
 
     def __len__(self) -> int:
         return len(self._view)
 
-    def __eq__(self, other: memoryview | _xmemoryview) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, _xmemoryview):
             other = other._view
         return self._view.__eq__(other)

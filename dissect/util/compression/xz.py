@@ -8,7 +8,7 @@ HEADER_FOOTER_SIZE = 12
 CRC_SIZE = 4
 
 
-def repair_checksum(fh: BinaryIO) -> BinaryIO:
+def repair_checksum(fh: BinaryIO) -> OverlayStream:
     """Repair CRC32 checksums for all headers in an XZ stream.
 
     FortiOS XZ files have (on purpose) corrupt streams which they read using a modified ``xz`` binary.
@@ -55,7 +55,7 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
     # Parse the index
     isize, num_records = _mbi(index[1:])
     index = index[1 + isize : -4]
-    records = []
+    records: list[tuple[int, int]] = []
     for _ in range(num_records):
         if not index:
             raise ValueError("Missing index size")

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from io import BytesIO
+import io
 from typing import BinaryIO
 
 
-def compress(src: bytes | BinaryIO) -> bytes:
+def compress(src: bytes | bytearray | memoryview | BinaryIO) -> bytes:
     """Sevenbit compress from a file-like object or bytes.
 
     Args:
@@ -13,8 +13,8 @@ def compress(src: bytes | BinaryIO) -> bytes:
     Returns:
         The compressed data.
     """
-    if not hasattr(src, "read"):
-        src = BytesIO(src)
+    if isinstance(src, (bytes, bytearray, memoryview)):
+        src = io.BytesIO(src)
 
     dst = bytearray()
 
@@ -39,7 +39,7 @@ def compress(src: bytes | BinaryIO) -> bytes:
     return bytes(dst)
 
 
-def decompress(src: bytes | BinaryIO, wide: bool = False) -> bytes:
+def decompress(src: bytes | bytearray | memoryview | BinaryIO, wide: bool = False) -> bytes:
     """Sevenbit decompress from a file-like object or bytes.
 
     Args:
@@ -48,8 +48,8 @@ def decompress(src: bytes | BinaryIO, wide: bool = False) -> bytes:
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
-        src = BytesIO(src)
+    if isinstance(src, (bytes, bytearray, memoryview)):
+        src = io.BytesIO(src)
 
     dst = bytearray()
 

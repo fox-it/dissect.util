@@ -19,17 +19,17 @@ def _read_16_bit(fh: BinaryIO) -> int:
 class Node:
     __slots__ = ("children", "is_leaf", "symbol")
 
-    def __init__(self, symbol: Symbol | None = None, is_leaf: bool = False):
+    def __init__(self, symbol: int = 0, is_leaf: bool = False):
         self.symbol = symbol
         self.is_leaf = is_leaf
-        self.children = [None, None]
+        self.children: list[Node | None] = [None, None]
 
 
 def _add_leaf(nodes: list[Node], idx: int, mask: int, bits: int) -> int:
     node = nodes[0]
     i = idx + 1
 
-    while bits > 1:
+    while node and bits > 1:
         bits -= 1
         childidx = (mask >> bits) & 1
         if node.children[childidx] is None:
@@ -38,6 +38,7 @@ def _add_leaf(nodes: list[Node], idx: int, mask: int, bits: int) -> int:
             i += 1
         node = node.children[childidx]
 
+    assert node
     node.children[mask & 1] = nodes[idx]
     return i
 
@@ -84,8 +85,9 @@ def _build_tree(buf: bytes) -> Node:
 
 
 class BitString:
+    source: BinaryIO
+
     def __init__(self):
-        self.source = None
         self.mask = 0
         self.bits = 0
 
@@ -114,16 +116,18 @@ class BitString:
             self.mask += _read_16_bit(self.source) << (16 - self.bits)
             self.bits += 16
 
-    def decode(self, root: Node) -> Symbol:
+    def decode(self, root: Node) -> int:
         node = root
-        while not node.is_leaf:
+        while node and not node.is_leaf:
             bit = self.lookup(1)
             self.skip(1)
             node = node.children[bit]
+
+        assert node
         return node.symbol
 
 
-def decompress(src: bytes | BinaryIO) -> bytes:
+def decompress(src: bytes | bytearray | memoryview | BinaryIO) -> bytes:
     """LZXPRESS decompress from a file-like object or bytes.
 
     Decompresses until EOF of the input data.
@@ -134,7 +138,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, (bytes, bytearray, memoryview)):
         src = io.BytesIO(src)
 
     dst = bytearray()
