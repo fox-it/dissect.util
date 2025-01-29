@@ -214,7 +214,7 @@ def _swap16(value: int) -> int:
     return ((value & 0xFF) << 8) | (value >> 8)
 
 
-def CpioFile(*args, **kwargs) -> tarfile.TarFile:
+def CpioFile(*args, **kwargs) -> tarfile.TarFile:  # noqa: N802
     """Utility wrapper around ``tarfile.TarFile`` to easily open cpio archives."""
     kwargs.setdefault("format", FORMAT_CPIO_UNKNOWN)
     return tarfile.TarFile(*args, **kwargs, tarinfo=CpioInfo)

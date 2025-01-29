@@ -51,7 +51,7 @@ def xmemoryview(view: bytes, format: str) -> memoryview | _xmemoryview:
     return _xmemoryview(view, format)
 
 
-class _xmemoryview:
+class _xmemoryview:  # noqa: N801
     """Wrapper for memoryview that converts between host and a different destination endianness.
 
     Args:

@@ -57,9 +57,11 @@ select = [
   "E",
   "W",
   "I",
+  "N",
   "UP",
   "YTT",
   "ANN",
+  "S",
   "B",
   "C4",
   "DTZ",
@@ -86,10 +88,11 @@ select = [
   "FURB",
   "RUF",
 ]
-ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003"]
+ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "S110", "SIM105", "TRY003"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/docs/**" = ["INP001"]
+"tests/**" = ["S101"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["dissect.util"]
