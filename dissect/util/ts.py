@@ -234,6 +234,9 @@ def uuid1timestamp(ts: int) -> datetime:
     return _calculate_timestamp(float(ts) * 1e-7 - 12219292800)
 
 
+DOS_EPOCH_YEAR = 1980
+
+
 def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime:
     """Converts MS-DOS timestamps to naive datetime objects.
 
@@ -243,15 +246,13 @@ def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime
     According to http://www.vsft.com/hal/dostime.htm
 
     Args:
-        timestap: MS-DOS timestamp
-        centisecond: Optional ExFAT centisecond offset. Yes centisecond...
+        ts: MS-DOS timestamp
+        centiseconds: Optional ExFAT centisecond offset. Yes centisecond...
         swap: Optional swap flag if date and time bytes are swapped.
 
     Returns:
         Datetime object from the passed timestamp.
     """
-    DOS_EPOCH_YEAR = 1980
-
     # MS-DOS Date Time Format is actually 2 UINT16_T's first 16 bits are the time, second 16 bits are date
     # the year is an offset of the MS-DOS epoch year, which is 1980
 
