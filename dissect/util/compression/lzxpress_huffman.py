@@ -11,6 +11,7 @@ class Symbol(NamedTuple):
     length: int
     symbol: int
 
+HUFFMAN_BLOCK_SIZE = 65536
 
 def _read_16_bit(fh: BinaryIO) -> int:
     return struct.unpack("<H", fh.read(2).rjust(2, b"\x00"))[0]
@@ -147,11 +148,15 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     bitstring = BitString()
 
     while src.tell() - start_offset < size:
+        if size - (src.tell() - start_offset) <= 256:
+            dst.extend(src.read(size - (src.tell() - start_offset)))
+            return bytes(dst)
+
         root = _build_tree(src.read(256))
         bitstring.init(src)
 
         chunk_size = 0
-        while chunk_size < 65536 and src.tell() - start_offset < size:
+        while chunk_size < HUFFMAN_BLOCK_SIZE and src.tell() - start_offset < size:
             symbol = bitstring.decode(root)
             if symbol < 256:
                 dst.append(symbol)
