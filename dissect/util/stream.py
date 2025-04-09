@@ -651,6 +651,11 @@ class ZlibStream(AlignedStream):
 class CompressedStream(AlignedStream):
     """Create a stream from a file-like object which is compresssed. Decompressing it with the supplied decompressor.
 
+    This is useful for compressed file formats that store the compressed data in chunks like:
+      * Windows Imaging (WIM) archives (LZXPRESS + Huffman, LZX)
+      * Windows Overlay Filter (WOF) compressed files (LZXPRESS + Huffman, LZNT1, LZX) .
+      * Hiberfil.sys files (LZXPRESS).
+
     Args:
         fh: The source file-like object.
         offset: The offset in the source file-like object to start decompressing from.
@@ -658,7 +663,9 @@ class CompressedStream(AlignedStream):
         original_size: The size of the decompressed data.
         decompressor: A function that decompresses a chunk of data.
         chunk_size: The size of each chunk in bytes. Default is 32 KiB.
+        chunks: A tuple of offsets to each chunk of compressed data.
     """
+
     def __init__(
         self,
         fh: BinaryIO,
@@ -667,6 +674,7 @@ class CompressedStream(AlignedStream):
         original_size: int,
         decompressor: Callable[[bytes], bytes],
         chunk_size: int = 32 * 1024,
+        chunks: tuple[int, ...] | None = None,
     ):
         self.fh = fh
         self.offset = offset
@@ -674,19 +682,7 @@ class CompressedStream(AlignedStream):
         self.original_size = original_size
         self.decompressor = decompressor
         self.chunk_size = chunk_size
-
-        # Read the chunk table in advance
-        if chunk_size:
-            fh.seek(self.offset)
-            num_chunks = (original_size + self.chunk_size - 1) // self.chunk_size - 1
-            if num_chunks == 0:
-                self._chunks = (0,)
-            else:
-                entry_size = "Q" if original_size > 0xFFFFFFFF else "I"
-                pattern = f"<{num_chunks}{entry_size}"
-                self._chunks = (0, *struct.unpack(pattern, fh.read(struct.calcsize(pattern))))
-
-        self._data_offset = fh.tell()
+        self.chunks = chunks or (offset,)
 
         self._read_chunk = lru_cache(32)(self._read_chunk)
         super().__init__(self.original_size)
@@ -694,7 +690,7 @@ class CompressedStream(AlignedStream):
     def _read(self, offset: int, length: int) -> bytes:
         result = []
 
-        num_chunks = len(self._chunks)
+        num_chunks = len(self.chunks)
         chunk, offset_in_chunk = divmod(offset, self.chunk_size)
 
         while length:
@@ -702,9 +698,9 @@ class CompressedStream(AlignedStream):
                 # We somehow requested more data than we have runs for
                 break
 
-            chunk_offset = self._chunks[chunk]
+            chunk_offset = self.chunks[chunk]
             if chunk < num_chunks - 1:
-                next_chunk_offset = self._chunks[chunk + 1]
+                next_chunk_offset = self.chunks[chunk + 1]
                 chunk_remaining = self.chunk_size - offset_in_chunk
             else:
                 next_chunk_offset = self.compressed_size
@@ -722,6 +718,6 @@ class CompressedStream(AlignedStream):
         return b"".join(result)
 
     def _read_chunk(self, offset: int, size: int) -> bytes:
-        self.fh.seek(self._data_offset + offset)
+        self.fh.seek(offset)
         buf = self.fh.read(size)
         return self.decompressor(buf)
