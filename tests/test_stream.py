@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from dissect.util import stream
+from dissect.util.compression import lzxpress_huffman
 
 
 def test_range_stream() -> None:
@@ -217,3 +218,37 @@ def test_zlib_stream() -> None:
 
     fh.seek(0)
     assert fh.read() == data
+
+
+def test_compressed_stream_lzxpress_huffman() -> None:
+    data = io.BytesIO(
+        bytes.fromhex(
+            "4034030000000000000000000000000000000000000000000000000000000000"
+            "0000000000000000000000000000000000000000000000000000000000000000"
+            "0000000000000000000000000000000000000000000000000000000000000000"
+            "0000000000000000000000000000000000000000000000000000000000000000"
+            "0300000000000010000000000000000000000000000000000000000000000000"
+            "0000000000000000000000000000000000000000000000000000000000000000"
+            "0000000000000000000000000000000000000000000000000000000000000000"
+            "0000000000000000000000000000000000000000000000000000000000000000"
+            "a2e700b0fffc0ffffc07fffc030000fffc03"
+        )
+    )
+
+    size = 8192
+    compressed_size = 274
+
+    fh = stream.CompressedStream(data, 0, compressed_size, size, lzxpress_huffman.decompress)
+    assert fh.chunks == (0,)
+
+    fh.seek(0)
+    assert fh.read(4096) == b"\x01" * 4096
+
+    fh.seek(2048)
+    assert fh.read(4096) == b"\x01" * 2048 + b"\x02" * 2048
+
+    fh.seek(6144)
+    assert fh.read(2048) == b"\x03" * 1024 + b"\x04" * 1024
+
+    fh.seek(0)
+    assert fh.read() == b"\x01" * 4096 + b"\x02" * 2048 + b"\x03" * 1024 + b"\x04" * 1024
