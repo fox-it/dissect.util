@@ -20,7 +20,7 @@ DISSECT_FEATURES_DEFAULT = "latest"
 DISSECT_FEATURES_ENV = "DISSECT_FEATURES"
 
 
-class FeatureException(RuntimeError):
+class FeatureError(RuntimeError):
     pass
 
 
@@ -60,7 +60,7 @@ def feature(flag: Feature, alternative: Callable | None = None) -> Callable:
     if alternative is None:
 
         def alternative() -> NoReturn:
-            raise FeatureException(
+            raise FeatureError(
                 "\n".join(
                     [
                         "Feature disabled.",

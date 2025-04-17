@@ -21,8 +21,14 @@ def id_fn(val: bytes | str) -> str:
     if isinstance(val, str):
         return val
 
+    if val == b"":
+        return "empty-value"
+
     if isinstance(val, bytes):
         return val.hex()
+
+    if val is None:
+        return "None"
 
     return ""
 
@@ -71,6 +77,12 @@ def id_fn(val: bytes | str) -> str:
             "S-1-5-21-123456789-268435456-500",
             ">",
             True,
+        ),
+        (
+            b"",
+            "",
+            "<",
+            False,
         ),
     ],
     ids=id_fn,

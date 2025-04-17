@@ -42,12 +42,12 @@ def _verify_archive(archive: TarFile) -> None:
 @pytest.mark.parametrize(
     ("path", "format"),
     [
-        ("data/bin.cpio.gz", cpio.FORMAT_CPIO_BIN),
-        ("data/odc.cpio.gz", cpio.FORMAT_CPIO_ODC),
-        ("data/hpbin.cpio.gz", cpio.FORMAT_CPIO_HPBIN),
-        ("data/hpodc.cpio.gz", cpio.FORMAT_CPIO_HPODC),
-        ("data/newc.cpio.gz", cpio.FORMAT_CPIO_NEWC),
-        ("data/crc.cpio.gz", cpio.FORMAT_CPIO_CRC),
+        ("_data/bin.cpio.gz", cpio.FORMAT_CPIO_BIN),
+        ("_data/odc.cpio.gz", cpio.FORMAT_CPIO_ODC),
+        ("_data/hpbin.cpio.gz", cpio.FORMAT_CPIO_HPBIN),
+        ("_data/hpodc.cpio.gz", cpio.FORMAT_CPIO_HPODC),
+        ("_data/newc.cpio.gz", cpio.FORMAT_CPIO_NEWC),
+        ("_data/crc.cpio.gz", cpio.FORMAT_CPIO_CRC),
     ],
 )
 def test_cpio_formats(path: str, format: int) -> None:
