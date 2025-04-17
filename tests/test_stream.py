@@ -1,10 +1,19 @@
+from __future__ import annotations
+
+import importlib.util
 import io
 import zlib
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from dissect.util import stream
+
+if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
+
+HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
 
 def test_range_stream() -> None:
@@ -217,3 +226,23 @@ def test_zlib_stream() -> None:
 
     fh.seek(0)
     assert fh.read() == data
+
+
+class NullStream(stream.AlignedStream):
+    def __init__(self, size: int | None, align: int = stream.STREAM_BUFFER_SIZE):
+        super().__init__(size)
+
+    def _read(self, offset: int, length: int) -> bytes:
+        return b"\x00" * length
+
+
+@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
+def test_aligned_stream_read_fixed_size_benchmark(benchmark: BenchmarkFixture) -> None:
+    fh = NullStream(1024 * 1024)
+    benchmark(fh.read, 1234)
+
+
+@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
+def test_aligned_stream_read_none_size_benchmark(benchmark: BenchmarkFixture) -> None:
+    fh = NullStream(None)
+    benchmark(fh.read, 1234)
