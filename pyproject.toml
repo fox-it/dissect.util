@@ -91,9 +91,13 @@ known-third-party = ["dissect"]
 [tool.setuptools.packages.find]
 include = ["dissect.*"]
 
+[tool.setuptools.exclude-package-data]
+"*" = ["_native.src/*"]
+
 [tool.setuptools_scm]
 
-[tool.maturin]
-module-name = "dissect.util._native"
-manifest-path = "dissect/util/_native.src/Cargo.toml"
+[[tool.setuptools-rust.ext-modules]]
+target = "dissect.util._native"
+path = "dissect/util/_native.src/Cargo.toml"
 features = ["pyo3/extension-module"]
+strip = "All"
