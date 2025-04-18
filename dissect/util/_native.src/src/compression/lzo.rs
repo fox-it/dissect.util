@@ -29,11 +29,11 @@ fn decompress(
     let mut cursor = std::io::Cursor::new(src);
     lzokay_native::decompress(&mut cursor, Some(out_len))
         .map_err(|e| PyErr::new::<PyValueError, _>(e.to_string()))
-        .map(|result| PyBytes::new_bound(py, &result))
+        .map(|result| PyBytes::new(py, &result))
 }
 
 pub fn create_submodule(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    let submodule = PyModule::new_bound(m.py(), "lzo")?;
+    let submodule = PyModule::new(m.py(), "lzo")?;
     submodule.add_function(wrap_pyfunction!(decompress, m)?)?;
     m.add_submodule(&submodule)
 }

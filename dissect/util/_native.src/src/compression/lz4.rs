@@ -43,16 +43,16 @@ fn decompress(
             .map_err(|e| PyErr::new::<PyValueError, _>(e.to_string()))?
     };
 
-    let pyresult = PyBytes::new_bound(py, &result);
+    let pyresult = PyBytes::new(py, &result);
     if return_bytearray {
-        Ok(PyByteArray::from_bound(&pyresult)?.into())
+        Ok(PyByteArray::from(&pyresult)?.into())
     } else {
         Ok(pyresult.into())
     }
 }
 
 pub fn create_submodule(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    let submodule = PyModule::new_bound(m.py(), "lz4")?;
+    let submodule = PyModule::new(m.py(), "lz4")?;
     submodule.add_function(wrap_pyfunction!(decompress, m)?)?;
     m.add_submodule(&submodule)
 }
