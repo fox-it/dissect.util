@@ -10,9 +10,10 @@ on:
 
 jobs:
   ci:
-    uses: fox-it/dissect-workflow-templates/.github/workflows/dissect-ci-template.yml@main
+    uses: fox-it/dissect-workflow-templates/.github/workflows/dissect-ci-template.yml@build-native
     secrets: inherit
     with:
+      build-native: true
       run-benchmarks: true
 
   publish:
@@ -25,7 +26,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: packages
+          pattern: packages-*
           path: dist/
       # According to the documentation, it automatically looks inside the `dist/` folder for packages.
       - name: Publish package distributions to Pypi
