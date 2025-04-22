@@ -18,17 +18,40 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         pytest.skip("pytest-benchmark is not installed")
 
 
-@pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
-def lz4(request: pytest.FixtureRequest) -> ModuleType:
-    if request.param:
-        return pytest.importorskip("dissect.util._native", reason="_native module is unavailable").compression.lz4
-
-    return pytest.importorskip("dissect.util.compression.lz4")
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--force-native", action="store_true", default=False, help="run native tests, not allowing fallbacks"
+    )
 
 
 @pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
-def lzo(request: pytest.FixtureRequest) -> ModuleType:
+def _native(request: pytest.FixtureRequest, pytestconfig: pytest.Config) -> ModuleType:
     if request.param:
-        return pytest.importorskip("dissect.util._native", reason="_native module is unavailable").compression.lzo
+        try:
+            import dissect.util._native
+        except ImportError:
+            (pytest.fail if pytestconfig.getoption("--force-native") else pytest.skip)("_native module is unavailable")
+        else:
+            return dissect.util._native
 
-    return pytest.importorskip("dissect.util.compression.lzo")
+    return None
+
+
+@pytest.fixture(scope="session")
+def lz4(_native: ModuleType) -> ModuleType:
+    if _native:
+        return _native.compression.lz4
+
+    import dissect.util.compression.lz4
+
+    return dissect.util.compression.lz4
+
+
+@pytest.fixture(scope="session")
+def lzo(_native: ModuleType) -> ModuleType:
+    if _native:
+        return _native.compression.lzo
+
+    import dissect.util.compression.lzo
+
+    return dissect.util.compression.lzo

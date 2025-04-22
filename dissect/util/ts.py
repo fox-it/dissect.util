@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import struct
-import sys
 from datetime import datetime, timedelta, timezone
 
-if sys.platform in ("win32", "emscripten"):
+try:
+    datetime.fromtimestamp(-6969696969, tz=timezone.utc)
+
+    def _calculate_timestamp(ts: float) -> datetime:
+        """Calculate timestamps normally."""
+        return datetime.fromtimestamp(ts, tz=timezone.utc)
+except (OSError, OverflowError):
     _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
     def _calculate_timestamp(ts: float) -> datetime:
@@ -15,12 +20,6 @@ if sys.platform in ("win32", "emscripten"):
         This method is slower, so we split the implementation between Windows, WASM and other platforms.
         """
         return _EPOCH + timedelta(seconds=ts)
-
-else:
-
-    def _calculate_timestamp(ts: float) -> datetime:
-        """Calculate timestamps normally."""
-        return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
 def now() -> datetime:

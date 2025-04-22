@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import platform
 from datetime import datetime, timedelta, timezone
 from importlib import reload
 from typing import TYPE_CHECKING
@@ -10,14 +9,24 @@ import pytest
 
 if TYPE_CHECKING:
     from types import ModuleType
+    from typing import NoReturn
 
 
-@pytest.fixture(params=["windows", "emscripten", "linux"])
+@pytest.fixture(params=[True, False])
 def imported_ts(request: pytest.FixtureRequest) -> ModuleType:
-    with patch.object(platform, "system", return_value=request.param):
-        from dissect.util import ts
+    from dissect.util import ts
 
-        return reload(ts)
+    if request.param:
+
+        class MockDatetime(datetime):
+            @classmethod
+            def fromtimestamp(cls, *args, **kwargs) -> NoReturn:
+                raise OverflowError("Mock overflow error")
+
+        with patch("datetime.datetime", MockDatetime):
+            return reload(ts)
+
+    return reload(ts)
 
 
 @pytest.fixture
@@ -37,32 +46,32 @@ def test_now(ts: ModuleType) -> None:
     assert ts_now.tzinfo == timezone.utc
 
 
-def test_unix_now(imported_ts: ModuleType) -> None:
-    timestamp = imported_ts.unix_now()
+def test_unix_now(ts: ModuleType) -> None:
+    timestamp = ts.unix_now()
 
     assert isinstance(timestamp, int)
     assert datetime.fromtimestamp(timestamp, tz=timezone.utc).microsecond == 0
 
 
-def test_unix_now_ms(imported_ts: ModuleType) -> None:
-    timestamp = imported_ts.unix_now_ms()
+def test_unix_now_ms(ts: ModuleType) -> None:
+    timestamp = ts.unix_now_ms()
 
     assert isinstance(timestamp, int)
-    assert imported_ts.from_unix_ms(timestamp).microsecond == (timestamp % 1e3) * 1000
+    assert ts.from_unix_ms(timestamp).microsecond == (timestamp % 1e3) * 1000
 
 
-def test_unix_now_us(imported_ts: ModuleType) -> None:
-    timestamp = imported_ts.unix_now_us()
-
-    assert isinstance(timestamp, int)
-    assert imported_ts.from_unix_us(timestamp).microsecond == timestamp % 1e6
-
-
-def test_unix_now_ns(imported_ts: ModuleType) -> None:
-    timestamp = imported_ts.unix_now_ns()
+def test_unix_now_us(ts: ModuleType) -> None:
+    timestamp = ts.unix_now_us()
 
     assert isinstance(timestamp, int)
-    assert imported_ts.from_unix_ns(timestamp).microsecond == int((timestamp // 1000) % 1e6)
+    assert ts.from_unix_us(timestamp).microsecond == timestamp % 1e6
+
+
+def test_unix_now_ns(ts: ModuleType) -> None:
+    timestamp = ts.unix_now_ns()
+
+    assert isinstance(timestamp, int)
+    assert ts.from_unix_ns(timestamp).microsecond == int((timestamp // 1000) % 1e6)
 
 
 def test_to_unix(ts: ModuleType) -> None:
