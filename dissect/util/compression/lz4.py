@@ -29,10 +29,10 @@ def decompress(
     uncompressed_size: int = -1,
     return_bytearray: bool = False,
 ) -> bytes | tuple[bytes, int]:
-    """LZ4 decompress from a file-like object up to a certain length. Assumes no header.
+    """LZ4 decompress from a file-like object or bytes up to a certain length. Assumes no header.
 
     Args:
-        src: File-like object to decompress from.
+        src: File-like object or bytes to decompress from.
         uncompressed_size: Ignored, present for compatibility with native lz4.
         return_bytearray: Whether to return ``bytearray`` or ``bytes``.
 

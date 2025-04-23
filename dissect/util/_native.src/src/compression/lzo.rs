@@ -2,6 +2,20 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
+/// LZO decompress from bytes. Assumes no header.
+///
+/// Arguments are largely compatible with python-lzo API.
+///
+/// Unlike the Python implementation, this function does not support streaming decompression
+/// (i.e. reading from a file-like object).
+/// Args:
+///     src: Bytes to decompress.
+///     header: Whether the metadata header is included in the input.
+///     buflen: If ``header`` is ``False``, a buffer length in bytes must be given that will fit the output.
+///
+/// Returns:
+///     The decompressed data.
+///
 #[pyfunction]
 #[pyo3(signature = (src, header=true, buflen=-1))]
 fn decompress(
