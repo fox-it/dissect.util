@@ -24,34 +24,24 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-@pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
-def _native(request: pytest.FixtureRequest, pytestconfig: pytest.Config) -> ModuleType:
+def _native_or_python(name: str, request: pytest.FixtureRequest) -> ModuleType:
+    from dissect.util import compression
+
     if request.param:
-        try:
-            import dissect.util._native
-        except ImportError:
-            (pytest.fail if pytestconfig.getoption("--force-native") else pytest.skip)("_native module is unavailable")
-        else:
-            return dissect.util._native
+        if not (module := getattr(compression, f"{name}_native", None)):
+            (pytest.fail if request.config.getoption("--force-native") else pytest.skip)(
+                "_native module is unavailable"
+            )
 
-    return None
-
-
-@pytest.fixture(scope="session")
-def lz4(_native: ModuleType) -> ModuleType:
-    if _native:
-        return _native.compression.lz4
-
-    import dissect.util.compression.lz4
-
-    return dissect.util.compression.lz4
+        return module
+    return getattr(compression, f"{name}_python", None)
 
 
-@pytest.fixture(scope="session")
-def lzo(_native: ModuleType) -> ModuleType:
-    if _native:
-        return _native.compression.lzo
+@pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
+def lz4(request: pytest.FixtureRequest) -> ModuleType:
+    return _native_or_python("lz4", request)
 
-    import dissect.util.compression.lzo
 
-    return dissect.util.compression.lzo
+@pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
+def lzo(request: pytest.FixtureRequest) -> ModuleType:
+    return _native_or_python("lzo", request)

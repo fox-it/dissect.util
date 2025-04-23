@@ -25,7 +25,7 @@ try:
 
     lz4 = lz4_native = _native.compression.lz4
     lzo = lzo_native = _native.compression.lzo
-except ImportError:
+except (ImportError, AttributeError):
     lz4_native = lzo_native = None
 
 __all__ = [

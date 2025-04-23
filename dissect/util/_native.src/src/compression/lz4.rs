@@ -4,6 +4,19 @@ use pyo3::types::{PyByteArray, PyBytes};
 
 const MAX_DISCOVER_OUTPUT_SIZE: usize = 1024 * 1024 * 1024;
 
+/// LZ4 decompress bytes up to a certain length. Assumes no header.
+///
+/// Unlike the Python implementation, this function does not support streaming decompression
+/// (i.e. reading from a file-like object).
+///
+/// Args:
+///     src: Bytes to decompress.
+///     uncompressed_size: The uncompressed data size. If not provided or ``-1``, will try to discover it.
+///     return_bytearray: Whether to return ``bytearray`` or ``bytes``.
+///
+/// Returns:
+///     The decompressed data or a tuple of the decompressed data and the amount of bytes read.
+///
 #[pyfunction]
 #[pyo3(signature = (src, uncompressed_size=-1, return_bytearray=false))]
 fn decompress(
