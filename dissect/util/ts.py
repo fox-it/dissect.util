@@ -240,10 +240,10 @@ DOS_EPOCH_YEAR = 1980
 def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime:
     """Converts MS-DOS timestamps to naive datetime objects.
 
-    MS-DOS timestamps are recorded in local time, so we leave it up to the
-    caller to add optional timezone information.
+    MS-DOS timestamps are recorded in local time, so we leave it up to the caller to add optional timezone information.
 
-    According to http://www.vsft.com/hal/dostime.htm
+    References:
+        - https://web.archive.org/web/20180311003959/http://www.vsft.com/hal/dostime.htm
 
     Args:
         ts: MS-DOS timestamp
@@ -280,8 +280,8 @@ def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime
 
     return datetime(  # noqa: DTZ001
         year,
-        month,
-        day,
+        month or 1,
+        day or 1,
         hours,
         minutes,
         seconds + extra_seconds,
