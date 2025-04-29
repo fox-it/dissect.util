@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 import sys
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import datetime, timedelta, timezone
 
 if sys.platform in ("win32", "emscripten"):
     _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -240,10 +240,10 @@ DOS_EPOCH_YEAR = 1980
 def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime:
     """Converts MS-DOS timestamps to naive datetime objects.
 
-    MS-DOS timestamps are recorded in local time, so we leave it up to the
-    caller to add optional timezone information.
+    MS-DOS timestamps are recorded in local time, so we leave it up to the caller to add optional timezone information.
 
-    According to http://www.vsft.com/hal/dostime.htm
+    References:
+        - https://web.archive.org/web/20180311003959/http://www.vsft.com/hal/dostime.htm
 
     Args:
         ts: MS-DOS timestamp
@@ -280,33 +280,10 @@ def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime
 
     return datetime(  # noqa: DTZ001
         year,
-        month,
-        day,
+        month or 1,
+        day or 1,
         hours,
         minutes,
         seconds + extra_seconds,
         microseconds,
     )
-
-
-class UTC(tzinfo):
-    """tzinfo class for timezones that have a fixed-offset from UTC
-
-    Args:
-        tz_dict: Dictionary of ``{"name": "timezone name", "offset": offset_from_UTC_in_minutes}``
-    """
-
-    def __init__(self, tz_dict: dict[str, str | int]):
-        # offset should be in minutes
-        self.name = tz_dict["name"]
-        self.offset = timedelta(minutes=tz_dict["offset"])
-
-    def utcoffset(self, dt: datetime) -> timedelta:
-        return self.offset
-
-    def tzname(self, dt: datetime) -> str:
-        return self.name
-
-    def dst(self, dt: datetime) -> timedelta:
-        # do not account for daylight saving
-        return timedelta(0)
