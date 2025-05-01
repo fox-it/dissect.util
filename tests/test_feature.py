@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from dissect.util.feature import Feature, FeatureError, feature, feature_enabled

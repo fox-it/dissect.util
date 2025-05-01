@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.util.xmemoryview import xmemoryview
 
 

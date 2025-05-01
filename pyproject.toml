@@ -46,7 +46,7 @@ dump-nskeyedarchiver = "dissect.util.tools.dump_nskeyedarchiver:main"
 
 [tool.ruff]
 line-length = 120
-required-version = ">=0.9.0"
+required-version = ">=0.11.0"
 
 [tool.ruff.format]
 docstring-code-format = true

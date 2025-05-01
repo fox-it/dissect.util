@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import gzip
 from pathlib import Path
-from tarfile import TarFile
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.util import cpio
+
+if TYPE_CHECKING:
+    from tarfile import TarFile
 
 
 def absolute_path(filename: str) -> Path:
