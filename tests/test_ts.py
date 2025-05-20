@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import platform
 from datetime import datetime, timedelta, timezone
 from importlib import reload
-from types import ModuleType
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 
 @pytest.fixture(params=["windows", "emscripten", "linux"])

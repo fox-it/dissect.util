@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import io
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -10,8 +9,6 @@ from dissect.util import sid
 
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
-
-HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
 
 def id_fn(val: bytes | str) -> str:
@@ -91,7 +88,7 @@ def test_read_sid(binary_sid: bytes | BinaryIO, endian: str, swap_last: bool, re
     assert readable_sid == sid.read_sid(binary_sid, endian, swap_last)
 
 
-@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
+@pytest.mark.benchmark
 @pytest.mark.parametrize(
     ("binary_sid", "swap_last"),
     [

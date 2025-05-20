@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import io
 import zlib
 from typing import TYPE_CHECKING
@@ -12,8 +11,6 @@ from dissect.util import stream
 
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
-
-HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
 
 def test_range_stream() -> None:
@@ -236,13 +233,25 @@ class NullStream(stream.AlignedStream):
         return b"\x00" * length
 
 
-@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
+@pytest.mark.benchmark
 def test_aligned_stream_read_fixed_size_benchmark(benchmark: BenchmarkFixture) -> None:
     fh = NullStream(1024 * 1024)
-    benchmark(fh.read, 1234)
+
+    @benchmark
+    def run() -> None:
+        fh.seek(0)
+        fh.read(1234)
+
+    assert run is None
 
 
-@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
+@pytest.mark.benchmark
 def test_aligned_stream_read_none_size_benchmark(benchmark: BenchmarkFixture) -> None:
     fh = NullStream(None)
-    benchmark(fh.read, 1234)
+
+    @benchmark
+    def run() -> None:
+        fh.seek(0)
+        fh.read(1234)
+
+    assert run is None
