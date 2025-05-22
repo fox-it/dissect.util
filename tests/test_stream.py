@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import io
 import zlib
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from dissect.util import stream
+
+if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def test_range_stream() -> None:
@@ -94,6 +100,20 @@ def test_mapping_stream() -> None:
     fh.add(2048, 412, io.BytesIO(b"\x05" * 512), 100)
     assert fh.read(512) == b"\x05" * 412
     assert fh.read(1) == b""
+
+
+def test_mapping_stream_same_offset() -> None:
+    buffers = [
+        io.BytesIO(b"\x01" * 512),
+        io.BytesIO(b"\x02" * 512),
+    ]
+    fh = stream.MappingStream()
+    # Add them in different orders to test if sorting works
+    fh.add(0, 1024, buffers[0])
+    fh.add(0, 1024, buffers[1])  # This should not raise an exception in add()
+
+    assert fh._runs[0][2] == buffers[0]
+    assert fh._runs[1][2] == buffers[1]
 
 
 def test_runlist_stream() -> None:
@@ -203,3 +223,35 @@ def test_zlib_stream() -> None:
 
     fh.seek(0)
     assert fh.read() == data
+
+
+class NullStream(stream.AlignedStream):
+    def __init__(self, size: int | None, align: int = stream.STREAM_BUFFER_SIZE):
+        super().__init__(size)
+
+    def _read(self, offset: int, length: int) -> bytes:
+        return b"\x00" * length
+
+
+@pytest.mark.benchmark
+def test_aligned_stream_read_fixed_size_benchmark(benchmark: BenchmarkFixture) -> None:
+    fh = NullStream(1024 * 1024)
+
+    @benchmark
+    def run() -> None:
+        fh.seek(0)
+        fh.read(1234)
+
+    assert run is None
+
+
+@pytest.mark.benchmark
+def test_aligned_stream_read_none_size_benchmark(benchmark: BenchmarkFixture) -> None:
+    fh = NullStream(None)
+
+    @benchmark
+    def run() -> None:
+        fh.seek(0)
+        fh.read(1234)
+
+    assert run is None

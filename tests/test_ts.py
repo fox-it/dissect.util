@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import platform
 from datetime import datetime, timedelta, timezone
 from importlib import reload
-from types import ModuleType
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 
 @pytest.fixture(params=["windows", "emscripten", "linux"])
@@ -132,6 +137,11 @@ def test_webkittimestamp(imported_ts: ModuleType) -> None:
 def test_cocoatimestamp(imported_ts: ModuleType) -> None:
     assert imported_ts.cocoatimestamp(622894123) == datetime(2020, 9, 27, 10, 8, 43, tzinfo=timezone.utc)
     assert imported_ts.cocoatimestamp(622894123.221783) == datetime(2020, 9, 27, 10, 8, 43, 221783, tzinfo=timezone.utc)
+
+
+def test_dostimestamp(imported_ts: ModuleType) -> None:
+    assert imported_ts.dostimestamp(1391424892, 3) == datetime(2021, 7, 15, 14, 43, 56, 30000)  # noqa: DTZ001
+    assert imported_ts.dostimestamp(0) == datetime(1980, 1, 1, 0, 0)  # noqa: DTZ001
 
 
 def test_negative_timestamps(imported_ts: ModuleType) -> None:

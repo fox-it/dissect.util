@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import datetime
-import plistlib
 import sys
 import uuid
+from plistlib import UID
 from unittest.mock import patch
 
 import pytest
@@ -11,8 +13,6 @@ from dissect.util.plist import NSKeyedArchiver
 
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="requires python3.8 or higher")
 def test_plist_nskeyedarchiver() -> None:
-    UID = plistlib.UID
-
     data = {
         "$version": 100000,
         "$archiver": "NSKeyedArchiver",

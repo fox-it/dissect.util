@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import pytest
 
-from dissect.util.feature import Feature, FeatureException, feature, feature_enabled
+from dissect.util.feature import Feature, FeatureError, feature, feature_enabled
 
 
 def test_feature_flags() -> None:
@@ -26,7 +28,7 @@ def test_feature_flags() -> None:
     assert experimental() is False
     assert advanced() is False
     assert latest() is True
-    with pytest.raises(FeatureException):
+    with pytest.raises(FeatureError):
         assert expert() is True
 
 

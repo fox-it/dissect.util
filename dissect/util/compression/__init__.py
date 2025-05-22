@@ -1,5 +1,7 @@
-from dissect.util.compression import lz4 as lz4_python
-from dissect.util.compression import lzo as lzo_python
+from dissect.util.compression import lz4, lzo
+
+lz4_python = lz4
+lzo_python = lzo
 
 # This selects between the native version of lz4 (when installed) and our own
 # pure-Python implementation.
@@ -19,7 +21,6 @@ try:
     import lz4.block as lz4
     import lz4.block as lz4_native
 except ImportError:
-    lz4 = lz4_python
     lz4_native = None
 
 # This selects between the native version of lzo (when installed) and our own
@@ -40,7 +41,6 @@ try:
     import lzo
     import lzo as lzo_native
 except ImportError:
-    lzo = lzo_python
     lzo_native = None
 
 __all__ = [

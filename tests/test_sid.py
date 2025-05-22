@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import io
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 import pytest
 
 from dissect.util import sid
+
+if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def id_fn(val: bytes | str) -> str:
@@ -15,8 +18,14 @@ def id_fn(val: bytes | str) -> str:
     if isinstance(val, str):
         return val
 
+    if val == b"":
+        return "empty-value"
+
     if isinstance(val, bytes):
         return val.hex()
+
+    if val is None:
+        return "None"
 
     return ""
 
@@ -66,8 +75,33 @@ def id_fn(val: bytes | str) -> str:
             ">",
             True,
         ),
+        (
+            b"",
+            "",
+            "<",
+            False,
+        ),
     ],
     ids=id_fn,
 )
 def test_read_sid(binary_sid: bytes | BinaryIO, endian: str, swap_last: bool, readable_sid: str) -> None:
     assert readable_sid == sid.read_sid(binary_sid, endian, swap_last)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    ("binary_sid", "swap_last"),
+    [
+        (
+            b"\x01\x04\x00\x00\x00\x00\x00\x05\x15\x00\x00\x00\x15\xcd\x5b\x07\x00\x00\x00\x10\xf4\x01\x00\x00",
+            False,
+        ),
+        (
+            b"\x01\x04\x00\x00\x00\x00\x00\x05\x15\x00\x00\x00\x15\xcd\x5b\x07\x00\x00\x00\x10\x00\x00\x01\xf4",
+            True,
+        ),
+    ],
+    ids=id_fn,
+)
+def test_read_sid_benchmark(benchmark: BenchmarkFixture, binary_sid: bytes, swap_last: bool) -> None:
+    benchmark(sid.read_sid, binary_sid, "<", swap_last)

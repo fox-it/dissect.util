@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 import sys
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import datetime, timedelta, timezone
 
 if sys.platform in ("win32", "emscripten"):
     _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -234,24 +234,25 @@ def uuid1timestamp(ts: int) -> datetime:
     return _calculate_timestamp(float(ts) * 1e-7 - 12219292800)
 
 
+DOS_EPOCH_YEAR = 1980
+
+
 def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime:
     """Converts MS-DOS timestamps to naive datetime objects.
 
-    MS-DOS timestamps are recorded in local time, so we leave it up to the
-    caller to add optional timezone information.
+    MS-DOS timestamps are recorded in local time, so we leave it up to the caller to add optional timezone information.
 
-    According to http://www.vsft.com/hal/dostime.htm
+    References:
+        - https://web.archive.org/web/20180311003959/http://www.vsft.com/hal/dostime.htm
 
     Args:
-        timestap: MS-DOS timestamp
-        centisecond: Optional ExFAT centisecond offset. Yes centisecond...
+        ts: MS-DOS timestamp
+        centiseconds: Optional ExFAT centisecond offset. Yes centisecond...
         swap: Optional swap flag if date and time bytes are swapped.
 
     Returns:
         Datetime object from the passed timestamp.
     """
-    DOS_EPOCH_YEAR = 1980
-
     # MS-DOS Date Time Format is actually 2 UINT16_T's first 16 bits are the time, second 16 bits are date
     # the year is an offset of the MS-DOS epoch year, which is 1980
 
@@ -279,33 +280,10 @@ def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime
 
     return datetime(  # noqa: DTZ001
         year,
-        month,
-        day,
+        month or 1,
+        day or 1,
         hours,
         minutes,
         seconds + extra_seconds,
         microseconds,
     )
-
-
-class UTC(tzinfo):
-    """tzinfo class for timezones that have a fixed-offset from UTC
-
-    Args:
-        tz_dict: Dictionary of ``{"name": "timezone name", "offset": offset_from_UTC_in_minutes}``
-    """
-
-    def __init__(self, tz_dict: dict[str, str | int]):
-        # offset should be in minutes
-        self.name = tz_dict["name"]
-        self.offset = timedelta(minutes=tz_dict["offset"])
-
-    def utcoffset(self, dt: datetime) -> timedelta:
-        return self.offset
-
-    def tzname(self, dt: datetime) -> str:
-        return self.name
-
-    def dst(self, dt: datetime) -> timedelta:
-        # do not account for daylight saving
-        return timedelta(0)

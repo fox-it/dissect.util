@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import hashlib
 import lzma
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.util.compression import lz4, lznt1, lzo, lzxpress, lzxpress_huffman, sevenbit, xz
+
+if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def test_lz4_decompress() -> None:
@@ -20,6 +26,19 @@ def test_lznt1_decompress() -> None:
             "138805b4024a44ef0358028c091601484500be009e000401189000"
         )
     ) == (
+        b"F# F# G A A G F# E D D E F# F# E E F# F# G A A "
+        b"G F# E D D E F# E D D E E F# D E F# G F# D E F# "
+        b"G F# E D E A F# F# G A A G F# E D D E F# E D D\x00"
+    )
+
+
+@pytest.mark.benchmark
+def test_benchmark_lznt1_decompress(benchmark: BenchmarkFixture) -> None:
+    buf = bytes.fromhex(
+        "38b08846232000204720410010a24701a045204400084501507900c045200524"
+        "138805b4024a44ef0358028c091601484500be009e000401189000"
+    )
+    assert benchmark(lznt1.decompress, buf) == (
         b"F# F# G A A G F# E D D E F# F# E E F# F# G A A "
         b"G F# E D D E F# E D D E E F# D E F# G F# D E F# "
         b"G F# E D E A F# F# G A A G F# E D D E F# E D D\x00"
@@ -231,8 +250,30 @@ def test_lzxpress_huffman_decompress() -> None:
     )
 
 
+@pytest.mark.benchmark
+def test_benchmark_lzxpress_huffman_decompress(benchmark: BenchmarkFixture) -> None:
+    buf = bytes.fromhex(
+        "0000000000000000000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000000030230000000000000000000000000000"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+        "0200000000000000000000000000002000000000000000000000000000000000"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+        "a8dc0000ff2601"
+    )
+    assert benchmark(lzxpress_huffman.decompress, buf) == b"abc" * 100
+
+
 def test_lzxpress_decompress() -> None:
     assert lzxpress.decompress(bytes.fromhex("ffff ff1f 6162 6317 000f ff26 01")) == b"abc" * 100
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzxpress_decompress(benchmark: BenchmarkFixture) -> None:
+    buf = bytes.fromhex("ffff ff1f 6162 6317 000f ff26 01")
+    assert benchmark(lzxpress.decompress, buf) == b"abc" * 100
 
 
 def test_sevenbit_compress() -> None:
@@ -241,16 +282,34 @@ def test_sevenbit_compress() -> None:
     assert result == target
 
 
+@pytest.mark.benchmark
+def test_benchmark_sevenbit_compress(benchmark: BenchmarkFixture) -> None:
+    buf = b"7-bit compression test string"
+    assert benchmark(sevenbit.compress, buf) == bytes.fromhex("b796384d078ddf6db8bc3c9fa7df6e10bd3ca783e67479da7d06")
+
+
 def test_sevenbit_decompress() -> None:
     result = sevenbit.decompress(bytes.fromhex("b796384d078ddf6db8bc3c9fa7df6e10bd3ca783e67479da7d06"))
     target = b"7-bit compression test string"
     assert result == target
 
 
+@pytest.mark.benchmark
+def test_benchmark_sevenbit_decompress(benchmark: BenchmarkFixture) -> None:
+    buf = bytes.fromhex("b796384d078ddf6db8bc3c9fa7df6e10bd3ca783e67479da7d06")
+    assert benchmark(sevenbit.decompress, buf) == b"7-bit compression test string"
+
+
 def test_sevenbit_decompress_wide() -> None:
     result = sevenbit.decompress(bytes.fromhex("b796384d078ddf6db8bc3c9fa7df6e10bd3ca783e67479da7d06"), wide=True)
     target = "7-bit compression test string".encode("utf-16-le")
     assert result == target
+
+
+@pytest.mark.benchmark
+def test_benchmark_sevenbit_decompress_wide(benchmark: BenchmarkFixture) -> None:
+    buf = bytes.fromhex("b796384d078ddf6db8bc3c9fa7df6e10bd3ca783e67479da7d06")
+    assert benchmark(sevenbit.decompress, buf, wide=True) == "7-bit compression test string".encode("utf-16-le")
 
 
 def test_xz_repair_checksum() -> None:

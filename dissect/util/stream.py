@@ -53,7 +53,7 @@ class AlignedStream(io.RawIOBase):
 
     def _fill_buf(self) -> None:
         """Fill the alignment buffer if we can."""
-        if self._buf or self.size is not None and (self.size <= self._pos or self.size <= self._pos_align):
+        if self._buf or (self.size is not None and (self.size <= self._pos or self.size <= self._pos_align)):
             return
 
         self._buf = self._read(self._pos_align, self.align)
@@ -111,7 +111,7 @@ class AlignedStream(io.RawIOBase):
                 remaining = size - self._pos
                 n = remaining if n == -1 else min(n, remaining)
 
-            if n == 0 or size is not None and size <= self._pos:
+            if n == 0 or (size is not None and size <= self._pos):
                 return b""
 
             # Read misaligned start from buffer
@@ -281,9 +281,11 @@ class MappingStream(AlignedStream):
             size: The size that this mapped fh spans in the stream.
             fh: The file-like object to map.
             file_offset: The offset in the fh to start from.
+
+        Note that there is no check on overlapping offsets and/or sizes.
         """
         self._runs.append((offset, size, fh, file_offset))
-        self._runs = sorted(self._runs)
+        self._runs = sorted(self._runs, key=lambda run: run[0])
         self._buf = None
         self.size = self._runs[-1][0] + self._runs[-1][1]
 

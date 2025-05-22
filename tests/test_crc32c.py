@@ -1,6 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
 from dissect.util import crc32c
+
+if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 @pytest.mark.parametrize(
@@ -24,3 +31,8 @@ from dissect.util import crc32c
 )
 def test_crc32c(data: bytes, value: int, expected: int) -> None:
     assert crc32c.crc32c(data, value) == expected
+
+
+@pytest.mark.benchmark
+def test_crc32c_benchmark(benchmark: BenchmarkFixture) -> None:
+    benchmark(crc32c.crc32c, b"hello, world!", 0)
