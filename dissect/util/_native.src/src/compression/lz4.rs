@@ -4,6 +4,33 @@ use pyo3::types::{PyByteArray, PyBytes};
 
 const MAX_DISCOVER_OUTPUT_SIZE: usize = 1024 * 1024 * 1024;
 
+fn decompress_to_unknown_size(src: &[u8]) -> Result<Vec<u8>, PyErr> {
+    let mut output_size = lz4_flex::block::get_maximum_output_size(src.len());
+    loop {
+        // If the output size is too large, we should not attempt to decompress further
+        if output_size > MAX_DISCOVER_OUTPUT_SIZE {
+            return Err(PyErr::new::<PyValueError, _>(
+                "output size is too large".to_string(),
+            ));
+        }
+
+        match lz4_flex::block::decompress(&src, output_size) {
+            Ok(result) => {
+                break Ok(result);
+            }
+            Err(lz4_flex::block::DecompressError::OutputTooSmall {
+                expected,
+                actual: _,
+            }) => {
+                output_size = expected;
+            }
+            Err(e) => {
+                return Err(PyErr::new::<PyValueError, _>(e.to_string()));
+            }
+        }
+    }
+}
+
 /// LZ4 decompress bytes up to a certain length. Assumes no header.
 ///
 /// Unlike the Python implementation, this function does not support streaming decompression
@@ -15,7 +42,7 @@ const MAX_DISCOVER_OUTPUT_SIZE: usize = 1024 * 1024 * 1024;
 ///     return_bytearray: Whether to return ``bytearray`` or ``bytes``.
 ///
 /// Returns:
-///     The decompressed data or a tuple of the decompressed data and the amount of bytes read.
+///     The decompressed data.
 ///
 #[pyfunction]
 #[pyo3(signature = (src, uncompressed_size=-1, return_bytearray=false))]
@@ -27,30 +54,7 @@ fn decompress(
 ) -> PyResult<PyObject> {
     let result = if uncompressed_size < 0 {
         // If the uncompressed size is not provided, we need to discover it first
-        let mut output_size = lz4_flex::block::get_maximum_output_size(src.len());
-        loop {
-            // If the output size is too large, we should not attempt to decompress further
-            if output_size > MAX_DISCOVER_OUTPUT_SIZE {
-                return Err(PyErr::new::<PyValueError, _>(
-                    "output size is too large".to_string(),
-                ));
-            }
-
-            match lz4_flex::block::decompress(&src, output_size) {
-                Ok(result) => {
-                    break result;
-                }
-                Err(lz4_flex::block::DecompressError::OutputTooSmall {
-                    expected,
-                    actual: _,
-                }) => {
-                    output_size = expected;
-                }
-                Err(e) => {
-                    return Err(PyErr::new::<PyValueError, _>(e.to_string()));
-                }
-            }
-        }
+        decompress_to_unknown_size(&src)?
     } else {
         lz4_flex::block::decompress(&src, uncompressed_size as usize)
             .map_err(|e| PyErr::new::<PyValueError, _>(e.to_string()))?

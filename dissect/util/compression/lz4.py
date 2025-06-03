@@ -37,7 +37,7 @@ def decompress(
         return_bytearray: Whether to return ``bytearray`` or ``bytes``.
 
     Returns:
-        The decompressed data or a tuple of the decompressed data and the amount of bytes read.
+        The decompressed data.
     """
     if not hasattr(src, "read"):
         src = io.BytesIO(src)

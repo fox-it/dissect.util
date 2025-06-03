@@ -24,24 +24,20 @@ fn decompress(
     header: bool,
     buflen: isize,
 ) -> PyResult<Bound<'_, PyBytes>> {
-    let (src, out_len) = if header {
+    let (body, out_len) = if header {
+        // Compatibility with python-lzo, which can include a header
+        // https://github.com/jd-boyd/python-lzo/blob/80ca60416c6657d373c5308a1eb511903a3ff9b1/lzomodule.c#L238-L269
         if src.len() < 8 || src[0] < 0xf0 || src[0] > 0xf1 {
-            return Err(PyErr::new::<PyValueError, _>(
-                "Invalid header value".to_string(),
-            ));
+            return Err(PyValueError::new_err("Invalid header value"));
         }
         let len = u32::from_le_bytes([src[1], src[2], src[3], src[4]]) as usize;
-        (src[5..].to_vec(), len)
-    } else if buflen < 0 {
-        return Err(PyErr::new::<PyValueError, _>(
-            "Buffer length must be provided".to_string(),
-        ));
+        (src[5..].to_vec(), Some(len))
     } else {
-        (src, buflen as usize)
+        (src, (buflen >= 0).then_some(buflen as usize))
     };
 
-    let mut cursor = std::io::Cursor::new(src);
-    lzokay_native::decompress(&mut cursor, Some(out_len))
+    let mut cursor = std::io::Cursor::new(body);
+    lzokay_native::decompress(&mut cursor, out_len)
         .map_err(|e| PyErr::new::<PyValueError, _>(e.to_string()))
         .map(|result| PyBytes::new(py, &result))
 }
