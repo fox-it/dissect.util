@@ -183,7 +183,7 @@ def wintimestamp(ts: int | tuple[int, int]) -> datetime:
     """
     if isinstance(ts, tuple):
         if len(ts) != 2:
-            raise ValueError(f"Expected tuple with two values but got {ts!r}")
+            raise ValueError(f"Expected (dwLowDateTime, dwHighDateTime) tuple but got {ts!r}")
         ts = (ts[1] << 32) + ts[0]
 
     return _calculate_timestamp(float(ts) * 1e-7 - 11_644_473_600)  # Thanks FireEye
