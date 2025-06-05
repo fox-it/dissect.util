@@ -124,7 +124,7 @@ def test_wintimestamp(imported_ts: ModuleType) -> None:
     )
     assert imported_ts.wintimestamp((0xBACA7E00, 0x01DBD5F8)) == datetime(2025, 6, 5, 9, 3, 40, 0, tzinfo=timezone.utc)
 
-    with pytest.raises(ValueError, match=r"Expected tuple with two values but got \(1234567,\)"):
+    with pytest.raises(ValueError, match=r"Expected \(dwLowDateTime, dwHighDateTime\) tuple but got \(1234567,\)"):
         imported_ts.wintimestamp((1234567,))
 
 
