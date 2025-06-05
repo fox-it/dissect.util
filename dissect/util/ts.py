@@ -169,16 +169,24 @@ def xfstimestamp(seconds: int, nano: int) -> datetime:
 ufstimestamp = xfstimestamp
 
 
-def wintimestamp(ts: int) -> datetime:
-    """Converts Windows timestamps to aware datetime objects in UTC.
+def wintimestamp(ts: int | tuple[int, int]) -> datetime:
+    """Converts Windows ``FILETIME`` timestamps to aware datetime objects in UTC.
 
     Args:
-        ts: The Windows timestamp.
+        ts: The Windows timestamp integer or a tuple of integers (``dwLowDateTime``, ``dwHighDateTime``)
 
     Returns:
         Datetime object from the passed timestamp.
+
+    Resources:
+        - https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
     """
-    return _calculate_timestamp(float(ts) * 1e-7 - 11644473600)  # Thanks FireEye
+    if isinstance(ts, tuple):
+        if not len(ts) == 2:
+            raise ValueError(f"Expected tuple with two values but got {ts!r}")
+        ts = (ts[1] << 32) + ts[0]
+
+    return _calculate_timestamp(float(ts) * 1e-7 - 11_644_473_600)  # Thanks FireEye
 
 
 def oatimestamp(ts: float) -> datetime:
