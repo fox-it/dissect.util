@@ -182,7 +182,7 @@ def wintimestamp(ts: int | tuple[int, int]) -> datetime:
         - https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
     """
     if isinstance(ts, tuple):
-        if not len(ts) == 2:
+        if len(ts) != 2:
             raise ValueError(f"Expected tuple with two values but got {ts!r}")
         ts = (ts[1] << 32) + ts[0]
 
