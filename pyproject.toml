@@ -1,13 +1,15 @@
 [build-system]
-requires = ["setuptools>=65.5.0", "setuptools_scm[toml]>=6.4.0"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools>=77.0.0", "setuptools_scm[toml]>=6.4.0"]
+backend-path = ["dissect/util"]
+build-backend = "_build"
 
 [project]
 name = "dissect.util"
 description = "A Dissect module implementing various utility functions for the other Dissect modules"
 readme = "README.md"
 requires-python = "~=3.9"
-license.text = "Apache License 2.0"
+license = "Apache-2.0"
+license-files = ["LICENSE", "COPYRIGHT"]
 authors = [
   {name = "Dissect Team", email = "dissect@fox-it.com"}
 ]
@@ -16,7 +18,6 @@ classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
-  "License :: OSI Approved",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Topic :: Internet :: Log Analysis",
@@ -30,16 +31,6 @@ dynamic = ["version"]
 homepage = "https://dissect.tools"
 documentation = "https://docs.dissect.tools/en/latest/projects/dissect.util"
 repository = "https://github.com/fox-it/dissect.util"
-
-[project.optional-dependencies]
-lzo = [
-    # There are no Windows PyPy wheels available for python-lzo
-    # So we use a pure python fallback for it.
-    "python-lzo; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
-]
-lz4 = [
-    "lz4",
-]
 
 [project.scripts]
 dump-nskeyedarchiver = "dissect.util.tools.dump_nskeyedarchiver:main"
@@ -98,10 +89,16 @@ ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "S110
 known-first-party = ["dissect.util"]
 known-third-party = ["dissect"]
 
-[tool.setuptools]
-license-files = ["LICENSE", "COPYRIGHT"]
-
 [tool.setuptools.packages.find]
 include = ["dissect.*"]
 
+[tool.setuptools.exclude-package-data]
+"*" = ["_native.src/*"]
+
 [tool.setuptools_scm]
+
+[[tool.setuptools-rust.ext-modules]]
+target = "dissect.util._native"
+path = "dissect/util/_native.src/Cargo.toml"
+features = ["pyo3/extension-module"]
+strip = "All"
