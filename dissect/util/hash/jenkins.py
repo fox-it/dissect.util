@@ -60,7 +60,7 @@ def lookup8(key: bytes, level: int) -> int:
     return c
 
 
-def lookup8_quads(key: bytes, num: int, level: int) -> int:
+def lookup8_quads(key: bytes, level: int) -> int:
     """Hashes a key consisting of ``num`` 64-bit integers into a 64-bit value.
 
     This hash function is used in the ESXi kernel.
@@ -72,7 +72,8 @@ def lookup8_quads(key: bytes, num: int, level: int) -> int:
         - http://burtleburtle.net/bob/c/lookup8.c
         - ``HashFunc_HashQuads``
     """
-    quads = unpack(f"<{num}Q", key[: num * 8])
+    num = len(key) // 8
+    quads = unpack(f"<{num}Q", key)
     remaining = num
 
     a = level
