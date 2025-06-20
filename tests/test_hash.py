@@ -73,10 +73,10 @@ def test_lookup8_quads() -> None:
         "0000000000000000000000000000000000000000000000000000000000000000"
         "0000000000000000000000000000000000000000000000000000000000000000"
     )
-    assert lookup8_quads(key, 32, 42) == 0x68175B25629F42F4
+    assert lookup8_quads(key, 42) == 0x68175B25629F42F4
 
 
 @pytest.mark.benchmark
 def test_lookup8_quads_benchmark(benchmark: BenchmarkFixture) -> None:
     key = b"a" * 256
-    benchmark(lookup8_quads, key, 32, 42)
+    benchmark(lookup8_quads, key, 42)
