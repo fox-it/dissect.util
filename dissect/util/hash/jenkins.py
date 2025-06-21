@@ -63,10 +63,12 @@ def lookup8(key: bytes, level: int) -> int:
 def lookup8_quads(key: bytes, level: int) -> int:
     """Hashes a key consisting of ``num`` 64-bit integers into a 64-bit value.
 
-    This hash function is used in the ESXi kernel.
-    This variant is optimized for keys that are aligned to 64-bit boundaries.
-    The main effective difference from :func:`lookup8` is that in the final step,
-    the value of ``c`` is incremented by the number of quads, not the number of bytes in the key.
+    This hash function is used in the ESXi kernel, but unlike :func:`lookup8`, this variant is not compatible with
+    any of the original ``lookup8.c`` implementations. The difference between this variant and :func:`lookup8`
+    is that in the final step, the value of ``c`` is incremented by the number of quads, not the number
+    of bytes in the key. While ``hash2`` in ``lookup8.c`` is also optimized for 64-bit aligned keys,
+    (and uses the number of quads as argument for the key size, not bytes) it uses the length of the key
+    in bytes to increment ``c`` in the final step.
 
     References:
         - http://burtleburtle.net/bob/c/lookup8.c
