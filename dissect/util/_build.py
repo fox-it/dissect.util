@@ -1,3 +1,4 @@
+# Reference: https://setuptools.pypa.io/en/latest/build_meta.html#dynamic-build-dependencies-and-other-build-meta-tweaks
 from __future__ import annotations
 
 import os
