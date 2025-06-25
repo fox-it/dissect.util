@@ -3,6 +3,10 @@ from __future__ import annotations
 import struct
 from datetime import datetime, timedelta, timezone
 
+# Python on Windows and WASM (Emscripten) have problems calculating timestamps before 1970 (Unix epoch)
+# Calculating relatively from the epoch is required on these platforms
+# This method is slower, so we split the implementation between Windows, WASM and other platforms
+# This used to be a platform comparison, but that was not reliable enough, so ducktype it instead
 try:
     datetime.fromtimestamp(-6969696969, tz=timezone.utc)
 
@@ -13,12 +17,7 @@ except (OSError, OverflowError):
     _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
     def _calculate_timestamp(ts: float) -> datetime:
-        """Calculate timestamps relative from Unix epoch.
-
-        Python on Windows and WASM (Emscripten) have problems calculating timestamps before 1970 (Unix epoch).
-        Calculating relatively from the epoch is required to correctly calculate those timestamps.
-        This method is slower, so we split the implementation between Windows, WASM and other platforms.
-        """
+        """Calculate timestamps relative from Unix epoch."""
         return _EPOCH + timedelta(seconds=ts)
 
 

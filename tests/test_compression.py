@@ -50,13 +50,14 @@ def test_benchmark_lznt1_decompress(benchmark: BenchmarkFixture) -> None:
 @pytest.mark.parametrize(
     ("data", "header", "buflen", "digest"),
     [
-        (
+        pytest.param(
             bytes.fromhex("0361626361626320f314000f616263616263616263616263616263616263110000"),
             False,
             300,
             "d9f5aeb06abebb3be3f38adec9a2e3b94228d52193be923eb4e24c9b56ee0930",
+            id="basic",
         ),
-        (
+        pytest.param(
             bytes.fromhex(
                 "160900a40100400003a83e8e6302003800007104ff4000fc012add00032016dd"
                 "00042016dd00052016dd00062016dd00072016dd00082016dd00092016dd000a"
@@ -84,8 +85,9 @@ def test_benchmark_lznt1_decompress(benchmark: BenchmarkFixture) -> None:
             False,
             8192,
             "a4d6951085717a9698cd814899d11c931db1d4c0f7ddc3b1cba0f582142d4cf4",
+            id="large",
         ),
-        (
+        pytest.param(
             bytes.fromhex(
                 "290000352abd61b0010000d6100000020000000c03d304a5016d01a457000000"
                 "155d03e6440102c8d82a07ff40006f02e8276a540006020174800100d5fc018e"
@@ -222,15 +224,16 @@ def test_benchmark_lznt1_decompress(benchmark: BenchmarkFixture) -> None:
             False,
             8192,
             "efcff6f6fddf392a7d63966d2441accb27a62d61fe9aa57c5cb521d75e871f0c",
+            id="larger",
         ),
-        (
+        pytest.param(
             bytes.fromhex("f0000000041574657374110000"),
             True,
             -1,
             "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+            id="header",
         ),
     ],
-    ids=["basic", "large", "larger", "header"],
 )
 def test_lzo_decompress(lzo: ModuleType, data: bytes, header: bool, buflen: int, digest: str) -> None:
     assert hashlib.sha256(lzo.decompress(data, header, buflen)).hexdigest() == digest
