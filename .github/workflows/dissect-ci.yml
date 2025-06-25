@@ -10,7 +10,7 @@ on:
 
 jobs:
   ci:
-    uses: fox-it/dissect-workflow-templates/.github/workflows/dissect-ci-template.yml@build-native
+    uses: fox-it/dissect-workflow-templates/.github/workflows/dissect-ci-template.yml@main
     secrets: inherit
     with:
       build-native: true
