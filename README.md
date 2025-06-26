@@ -17,17 +17,13 @@ Information on the supported Python versions can be found in the Getting Started
 pip install dissect.util
 ```
 
-`dissect.util` includes pure Python implementations of the lz4 and lzo decompression algorithms. To automatically use
-the faster, native (C-based) lz4 and lzo implementations in other Dissect projects, install the package with the lz4 and
-lzo extras:
+`dissect.util` includes both pure Python implementations as well as a faster Rust implementation of the LZ4 and LZO decompression algorithms.
+Pre-build wheels are available for most common platforms and the native implementation will automatically be used if available.
+In the rare case that a pre-build wheel is not available, you can build a wheel for your platform by running the following command:
 
 ```bash
-pip install "dissect.util[lz4,lzo]"
+tox -e build-native
 ```
-
-Unfortunately there is no binary `python-lzo` wheel for PyPy installations on Windows, so it won't be installed there.
-
-This module including the lz4 and lzo extras is also automatically installed if you install the `dissect` package.
 
 ## Build and test instructions
 
