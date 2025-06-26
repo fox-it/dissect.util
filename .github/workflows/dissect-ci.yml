@@ -26,8 +26,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: packages-*
+          pattern: packages*
           path: dist/
+          merge-multiple: true
       # According to the documentation, it automatically looks inside the `dist/` folder for packages.
       - name: Publish package distributions to Pypi
         uses: pypa/gh-action-pypi-publish@release/v1
