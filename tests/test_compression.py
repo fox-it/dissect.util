@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def test_lz4_decompress(lz4: ModuleType) -> None:
     assert (
-        lz4.decompress(b"\xff\x0cLZ4 compression test string\x1b\x00\xdbPtring") == b"LZ4 compression test string" * 10
+        lz4.decompress(b"\x0e\x01\x00\x00\xff\x0cLZ4 compression test string\x1b\x00\xdbPtring") == b"LZ4 compression test string" * 10
     )
 
 
