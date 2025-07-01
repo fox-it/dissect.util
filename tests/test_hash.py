@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.util.hash.crc32c import crc32c
 from dissect.util.hash.jenkins import lookup8, lookup8_quads
 
 if TYPE_CHECKING:
+    from types import ModuleType
+
     from pytest_benchmark.fixture import BenchmarkFixture
 
 
@@ -30,13 +31,13 @@ if TYPE_CHECKING:
         (bytes(reversed(range(32))), 0, 0x113FDB5C),
     ],
 )
-def test_crc32c(data: bytes, value: int, expected: int) -> None:
-    assert crc32c(data, value) == expected
+def test_crc32c(crc32c: ModuleType, data: bytes, value: int, expected: int) -> None:
+    assert crc32c.crc32c(data, value) == expected
 
 
 @pytest.mark.benchmark
-def test_crc32c_benchmark(benchmark: BenchmarkFixture) -> None:
-    benchmark(crc32c, b"hello, world!", 0)
+def test_crc32c_benchmark(crc32c: ModuleType, benchmark: BenchmarkFixture) -> None:
+    benchmark(crc32c.crc32c, b"hello, world!", 0)
 
 
 def test_lookup8_remainder() -> None:
