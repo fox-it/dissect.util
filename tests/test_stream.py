@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import zlib
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -76,7 +76,8 @@ def test_buffered_stream() -> None:
     fh = stream.BufferedStream(buf, size=None)
 
     assert fh.read(10) == b"\x01" * 10
-    assert fh._buf == buf.getvalue()
+    assert fh._buf[: len(buf.getvalue())] == buf.getvalue()
+    assert fh._buf_size == 512 * 3
     assert fh.read() == buf.getvalue()[10:]
     assert fh.read(1) == b""
 
@@ -144,7 +145,7 @@ def test_aligned_stream_buffer() -> None:
     # Read aligned blocks so we move past the offset from where the buffer was read
     fh.read(1024)
     # Buffer should be reset
-    assert fh._buf is None
+    assert fh._buf_size == 0
     # Buffer should now be from the 3rd aligned block
     assert fh.read(256) == b"\x03" * 256
     assert fh._buf == b"\x03" * 512
@@ -223,6 +224,20 @@ def test_zlib_stream() -> None:
 
     fh.seek(0)
     assert fh.read() == data
+
+
+def test_layered_readinto() -> None:
+    size = 1024 * 64
+    buf = io.BytesIO(b"\x42" * size)
+    mock_buffer = Mock(wraps=buf)
+
+    fh = stream.BufferedStream(stream.BufferedStream(mock_buffer, 0, size), 0, size)
+    tmp = bytearray(1024)
+    fh.readinto(tmp)
+
+    # Test the bottom layer buffer was called with the cache object of the top layer
+    mock_buffer.readinto.assert_called_once()
+    assert mock_buffer.readinto.call_args[0][0].obj is fh._buf.obj
 
 
 class NullStream(stream.AlignedStream):
