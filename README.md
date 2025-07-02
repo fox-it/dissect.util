@@ -20,7 +20,7 @@ pip install dissect.util
 `dissect.util` includes both a pure Python implementation as well as a faster native Rust implementation of the LZ4 and LZO decompression algorithms.
 Pre-build wheels are available for most common platforms and the native implementation will automatically be used.
 In the rare case that a pre-build wheel is not available, the pure Python implementation will automatically be used instead.
-If you wish to build your own wheel  in the case a pre-build one is not available for your platform, you can do so by running the following command:
+If you wish to build your own wheel in the case a pre-build one is not available for your platform, you can do so by running the following command:
 
 ```bash
 tox -e build-native
