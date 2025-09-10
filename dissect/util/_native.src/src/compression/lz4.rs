@@ -51,7 +51,7 @@ fn decompress(
     src: Vec<u8>,
     uncompressed_size: isize,
     return_bytearray: bool,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let result = if uncompressed_size < 0 {
         // If the uncompressed size is not provided, we need to discover it first
         decompress_to_unknown_size(&src)?
