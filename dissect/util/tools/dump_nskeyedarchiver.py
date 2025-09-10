@@ -37,7 +37,7 @@ def print_object(obj: Any, indent: int = 0, seen: set | None = None) -> None:
             print(fmt(f"[{i}]:", indent))
             print_object(v, indent + 1, seen)
 
-    elif isinstance(obj, (dict, NSObject)):
+    elif isinstance(obj, dict | NSObject):
         if isinstance(obj, NSObject):
             print(fmt(obj, indent))
             try:

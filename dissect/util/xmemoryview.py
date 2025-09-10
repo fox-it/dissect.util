@@ -30,7 +30,7 @@ def xmemoryview(view: bytes, format: str) -> memoryview | _xmemoryview:
     if len(format) != 2:
         raise ValueError("Invalid format specification")
 
-    if isinstance(view, (bytes, bytearray)):
+    if isinstance(view, bytes | bytearray):
         view = memoryview(view)
 
     if not isinstance(view, memoryview):
@@ -96,7 +96,7 @@ class _xmemoryview:  # noqa: N801
         raise TypeError("Invalid index type")
 
     def __setitem__(self, idx: int | slice, value: list[int] | int) -> None:
-        if isinstance(idx, (int, slice)):
+        if isinstance(idx, int | slice):
             self._view[idx] = self._convert_to_native(value)
         else:
             raise TypeError("Invalid index type")
