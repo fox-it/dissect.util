@@ -58,7 +58,7 @@ class NSKeyedArchiver:
         if isinstance(obj, list):
             return list(map(self._parse, obj))
 
-        if isinstance(obj, (bool, bytes, int, float)) or obj is None:
+        if isinstance(obj, bool | bytes | int | float) or obj is None:
             return obj
 
         if isinstance(obj, str):
@@ -102,7 +102,7 @@ class NSObject:
 class NSDictionary(UserDict, NSObject):
     def __init__(self, nskeyed: NSKeyedArchiver, obj: dict[str, Any]):
         NSObject.__init__(self, nskeyed, obj)
-        self.data = {nskeyed._parse(key): obj for key, obj in zip(obj["NS.keys"], obj["NS.objects"])}
+        self.data = {nskeyed._parse(key): obj for key, obj in zip(obj["NS.keys"], obj["NS.objects"], strict=False)}
 
     def __repr__(self) -> str:
         return NSObject.__repr__(self)
