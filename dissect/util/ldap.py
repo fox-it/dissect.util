@@ -173,9 +173,8 @@ class LdapSearchFilter:
     def __repr__(self) -> str:
         if self.is_nested():
             return f"LdapSearchFilter(NESTED operator={self.operator}, children={self.children})"
-        return (
-            f'LdapSearchFilter(attribute="{self.attribute}", operator="{self.comparison_operator.value}", value={self.value})'
-        )
+        return f'LdapSearchFilter(attribute="{self.attribute}", operator="{self.comparison_operator.value}", \
+              value={self.value})'
 
     @classmethod
     def parse(cls, query: str, optimize: bool = True) -> LdapSearchFilter:

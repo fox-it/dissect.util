@@ -6,8 +6,8 @@ from dissect.util.ldap import (
     OPTIMIZER_ATTR_WEIGHTS,
     InvalidLDAPQueryError,
     LdapComparisonOperator,
-    LdapSearchFilter,
     LdapLogicalOperator,
+    LdapSearchFilter,
     optimize_ldap_query,
 )
 
