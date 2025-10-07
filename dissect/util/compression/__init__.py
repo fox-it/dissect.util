@@ -36,6 +36,7 @@ __all__ = [
     "lzo",
     "lzo_native",
     "lzo_python",
+    "lzvn",
     "lzxpress",
     "lzxpress_huffman",
     "sevenbit",
