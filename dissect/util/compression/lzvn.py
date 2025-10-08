@@ -204,7 +204,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
         elif opc in OP_EOS:
             opc_len = 8
 
-            if src_size <= opc_len:
+            if src_size < opc_len:
                 break
 
             src_size -= opc_len + L
