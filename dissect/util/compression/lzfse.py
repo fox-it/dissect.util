@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import struct
-from typing import BinaryIO, NamedTuple, Self
+from typing import BinaryIO, NamedTuple
 
 from dissect.util.compression import lzvn
 
@@ -111,7 +111,7 @@ class LZFSECompressedBlockHeader(NamedTuple):
     literal_freq: tuple[int, ...]
 
     @classmethod
-    def parse_v1(cls, fh: BinaryIO) -> Self:
+    def parse_v1(cls, fh: BinaryIO) -> LZFSECompressedBlockHeader:
         """Decode all fields from a v1 header."""
         values = cls.__struct_v1__.unpack(fh.read(cls.__struct_v1__.size))
 
@@ -135,10 +135,8 @@ class LZFSECompressedBlockHeader(NamedTuple):
         )
 
     @classmethod
-    def parse_v2(cls, fh: BinaryIO) -> Self:
+    def parse_v2(cls, fh: BinaryIO) -> LZFSECompressedBlockHeader:
         """Decode all fields from a v2 header."""
-        offset = fh.tell()
-
         values = cls.__struct_v2__.unpack(fh.read(cls.__struct_v2__.size))
         v0, v1, v2 = values[1:4]
 
@@ -146,39 +144,27 @@ class LZFSECompressedBlockHeader(NamedTuple):
         n_lmd_payload_bytes = _get_field(v1, 40, 20)
         n_payload_bytes = n_literal_payload_bytes + n_lmd_payload_bytes
 
-        src = fh.tell()
-        header_size = _get_field(v2, 0, 32)
-        src_end = offset + header_size - 4  # exclude magic
+        freq_tables_size = _get_field(v2, 0, 32) - cls.__struct_v2__.size - 4  # exclude magic
 
-        if src == src_end:
+        if freq_tables_size == 0:
             l_freq = (0,) * 20
             m_freq = (0,) * 20
             d_freq = (0,) * 64
             literal_freq = (0,) * 256
         else:
             accum = 0
-            accum_nbits = 0
+            accum = int.from_bytes(fh.read(freq_tables_size), "little")
             result = [0] * 720
 
             for i in range(
                 LZFSE_ENCODE_L_SYMBOLS + LZFSE_ENCODE_M_SYMBOLS + LZFSE_ENCODE_D_SYMBOLS + LZFSE_ENCODE_LITERAL_SYMBOLS
             ):
-                # Refill accum, one byte at a time, until we reach end of header, or accum is full
-                while src < src_end and accum_nbits + 8 <= 32:
-                    accum |= fh.read(1)[0] << accum_nbits
-                    accum_nbits += 8
-                    src += 1
-
                 # Decode and store value
                 nbits, value = _decode_v1_freq_value(accum)
-                if nbits > accum_nbits:
-                    raise ValueError("Invalid frequency table")
-
                 result[i] = value
 
                 # Consume nbits bits
                 accum >>= nbits
-                accum_nbits -= nbits
 
             l_freq = tuple(result[0:20])
             m_freq = tuple(result[20:40])
@@ -450,14 +436,14 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             literals = []
             state0, state1, state2, state3 = header.literal_state
             for _ in range(0, header.n_literals, 4):
-                state0, result0 = _decode(state0, literal_decoder, in_stream)
-                state1, result1 = _decode(state1, literal_decoder, in_stream)
-                state2, result2 = _decode(state2, literal_decoder, in_stream)
-                state3, result3 = _decode(state3, literal_decoder, in_stream)
-                literals.append(result0)
-                literals.append(result1)
-                literals.append(result2)
-                literals.append(result3)
+                state0, result = _decode(state0, literal_decoder, in_stream)
+                literals.append(result)
+                state1, result = _decode(state1, literal_decoder, in_stream)
+                literals.append(result)
+                state2, result = _decode(state2, literal_decoder, in_stream)
+                literals.append(result)
+                state3, result = _decode(state3, literal_decoder, in_stream)
+                literals.append(result)
 
             in_stream = _BitStream(src.read(header.n_lmd_payload_bytes), header.lmd_bits)
             dst += _decode_lmd(header, literals, l_decoder, m_decoder, d_decoder, in_stream)
