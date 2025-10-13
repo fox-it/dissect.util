@@ -127,6 +127,4 @@ def decompress(src: bytes | BinaryIO) -> bytes:
                         if uncompressed_size == 0:
                             break
 
-            break
-
     return bytes(dst)
