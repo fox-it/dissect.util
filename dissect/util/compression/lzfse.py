@@ -78,7 +78,6 @@ _d_base_value = (
 
 
 _I = struct.Struct("<I")
-_Q = struct.Struct("<Q")
 
 
 def _clz(n: int) -> int:
@@ -90,7 +89,13 @@ def _clz(n: int) -> int:
 class LZFSECompressedBlockHeader(NamedTuple):
     """LZFSE compressed block header."""
 
-    __struct_v1__ = struct.Struct("<IIIIIIi4HiHHH20H20H64H256H")
+    __struct_v1__ = struct.Struct(
+        "<IIIIIIi4HiHHH"
+        f"{LZFSE_ENCODE_L_SYMBOLS}H"
+        f"{LZFSE_ENCODE_M_SYMBOLS}H"
+        f"{LZFSE_ENCODE_D_SYMBOLS}H"
+        f"{LZFSE_ENCODE_LITERAL_SYMBOLS}H"
+    )
     __struct_v2__ = struct.Struct("<I3Q")
 
     n_raw_bytes: int
@@ -102,9 +107,9 @@ class LZFSECompressedBlockHeader(NamedTuple):
     literal_bits: int
     literal_state: tuple[int, int, int, int]
     lmd_bits: int
-    l_state: tuple[int, ...]
-    m_state: tuple[int, ...]
-    d_state: tuple[int, ...]
+    l_state: int
+    m_state: int
+    d_state: int
     l_freq: tuple[int, ...]
     m_freq: tuple[int, ...]
     d_freq: tuple[int, ...]
@@ -125,13 +130,13 @@ class LZFSECompressedBlockHeader(NamedTuple):
             literal_bits=values[6],
             literal_state=values[7:11],
             lmd_bits=values[11],
-            l_state=values[12:32],
-            m_state=values[32:52],
-            d_state=values[52:116],
-            l_freq=values[116:136],
-            m_freq=values[136:156],
-            d_freq=values[156:212],
-            literal_freq=values[212:468],
+            l_state=values[12],
+            m_state=values[13],
+            d_state=values[14],
+            l_freq=values[15 : 15 + LZFSE_ENCODE_L_SYMBOLS],
+            m_freq=values[35 : 35 + LZFSE_ENCODE_M_SYMBOLS],
+            d_freq=values[55 : 55 + LZFSE_ENCODE_D_SYMBOLS],
+            literal_freq=values[119 : 119 + LZFSE_ENCODE_LITERAL_SYMBOLS],
         )
 
     @classmethod
@@ -202,9 +207,7 @@ def _get_field(value: int, offset: int, nbits: int) -> int:
     If we number the bits of ``value`` from 0 (least significant) to 63 (most significant),
     the result is bits ``offset`` to ``offset+nbits-1``.
     """
-    if nbits == 32:
-        return (value >> offset) & 0xFFFFFFFF
-    return ((value >> offset) & ((1 << nbits) - 1)) & 0xFFFFFFFF
+    return (value >> offset) & ((1 << nbits) - 1)
 
 
 def _decode_v1_freq_value(bits: int) -> tuple[int, int]:
@@ -282,7 +285,7 @@ def _init_value_decoder_table(
 ) -> list[ValueDecoderEntry]:
     """Initialize value decoder table ``T[nstates]``.
 
-    ``nstates = sum req[i]`` is the number of states (a power of 2).
+    ``nstates = sum freq[i]`` is the number of states (a power of 2).
     ``freq`` is a normalized histogram of symbol frequencies, with ``freq[i] >= 0``.
     ``symbol_vbits`` and ``symbol_vbase`` are the number of value bits to read and the base value for each symbol.
 
@@ -333,7 +336,7 @@ def _decode(state: int, decoder_table: list[DecoderEntry], in_stream: _BitStream
     state = e.delta + in_stream.pull(e.k)
 
     # Return the symbol for this state
-    return state, e.symbol  # symbol
+    return state, e.symbol
 
 
 def _value_decode(state: int, decoder_table: list[ValueDecoderEntry], in_stream: _BitStream) -> tuple[int, int]:
@@ -379,7 +382,7 @@ def _decode_lmd(
         d_state, new_d = _value_decode(d_state, d_decoder, in_stream)
         D = new_d if new_d != 0 else D
 
-        if len(dst) + L < D:
+        if D is None or len(dst) + L < D:
             raise ValueError("Invalid match distance")
 
         dst += lit.read(L)
@@ -392,7 +395,7 @@ def _decode_lmd(
 
 
 def decompress(src: bytes | BinaryIO) -> bytes:
-    """LZVN decompress from a file-like object or bytes.
+    """LZFSE decompress from a file-like object or bytes.
 
     Decompresses until EOF or EOS of the input data.
 
