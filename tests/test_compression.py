@@ -345,7 +345,7 @@ def test_benchmark_lzbitmap_decompress(benchmark: BenchmarkFixture) -> None:
         "0000",
     )
     assert (
-        hashlib.sha256(benchmark(lzvn.decompress, buf)).hexdigest()
+        hashlib.sha256(benchmark(lzbitmap.decompress, buf)).hexdigest()
         == "73d3dd96ca2e2f0144a117019256d770ee7c6febeaee09b24956c723ae22b529"
     )
 
