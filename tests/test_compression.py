@@ -399,7 +399,7 @@ def test_benchmark_lzfse_decompress(benchmark: BenchmarkFixture) -> None:
         "0f4945ab8462767824"
     )
     assert (
-        hashlib.sha256(benchmark(lzvn.decompress, buf)).hexdigest()
+        hashlib.sha256(benchmark(lzfse.decompress, buf)).hexdigest()
         == "73d3dd96ca2e2f0144a117019256d770ee7c6febeaee09b24956c723ae22b529"
     )
 
