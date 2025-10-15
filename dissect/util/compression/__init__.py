@@ -33,6 +33,7 @@ __all__ = [
     "lz4_native",
     "lz4_python",
     "lzbitmap",
+    "lzfse",
     "lznt1",
     "lzo",
     "lzo_native",
