@@ -3,7 +3,10 @@ from __future__ import annotations
 import functools
 import os
 from enum import Enum
-from typing import Callable, NoReturn
+from typing import TYPE_CHECKING, NoReturn
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 # Register feature flags in a central place to avoid chaos

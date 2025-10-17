@@ -30,7 +30,7 @@ def xmemoryview(view: bytes, format: str) -> memoryview | _xmemoryview:
     if len(format) != 2:
         raise ValueError("Invalid format specification")
 
-    if isinstance(view, (bytes, bytearray)):
+    if isinstance(view, bytes | bytearray):
         view = memoryview(view)
 
     if not isinstance(view, memoryview):
@@ -68,9 +68,9 @@ class _xmemoryview:  # noqa: N801
         self._struct_to = struct.Struct(format)
 
     def tolist(self) -> list[int]:
-        return self._convert(self._view.tolist())
+        return self._convert_from_native(self._view.tolist())
 
-    def _convert(self, value: list[int] | int) -> int:
+    def _convert_from_native(self, value: list[int] | int) -> int:
         if isinstance(value, list):
             endian = self._format[0]
             fmt = self._format[1]
@@ -78,18 +78,28 @@ class _xmemoryview:  # noqa: N801
             return list(struct.unpack(f"{endian}{pck}", struct.pack(f"={pck}", *value)))
         return self._struct_to.unpack(self._struct_frm.pack(value))[0]
 
+    def _convert_to_native(self, value: list[int] | int) -> int:
+        if isinstance(value, list):
+            endian = self._format[0]
+            fmt = self._format[1]
+            pck = f"{len(value)}{fmt}"
+            return list(struct.unpack(f"={pck}", struct.pack(f"{endian}{pck}", *value)))
+        return self._struct_frm.unpack(self._struct_to.pack(value))[0]
+
     def __getitem__(self, idx: int | slice) -> int | bytes:
         value = self._view[idx]
         if isinstance(idx, int):
-            return self._convert(value)
+            return self._convert_from_native(value)
         if isinstance(idx, slice):
             return _xmemoryview(self._view[idx], self._format)
 
         raise TypeError("Invalid index type")
 
-    def __setitem__(self, *args, **kwargs) -> None:
-        # setitem looks like it's a no-op on cast memoryviews?
-        pass
+    def __setitem__(self, idx: int | slice, value: list[int] | int) -> None:
+        if isinstance(idx, int | slice):
+            self._view[idx] = self._convert_to_native(value)
+        else:
+            raise TypeError("Invalid index type")
 
     def __len__(self) -> int:
         return len(self._view)
@@ -101,7 +111,7 @@ class _xmemoryview:  # noqa: N801
 
     def __iter__(self) -> Iterator[int]:
         for value in self._view:
-            yield self._convert(value)
+            yield self._convert_from_native(value)
 
     def __getattr__(self, attr: str) -> Any:
         return getattr(self._view, attr)
