@@ -386,8 +386,12 @@ def _decode_lmd(
             raise ValueError("Invalid match distance")
 
         dst += lit.read(L)
-        for _ in range(M):
-            dst.append(dst[-D])
+
+        remaining = M
+        while remaining > 0:
+            match_size = min(remaining, D)
+            dst += dst[-D : (-D + match_size) or None]
+            remaining -= match_size
 
         symbols -= 1
 
