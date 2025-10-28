@@ -1,3 +1,3 @@
-from dissect.util._native import compression
+from dissect.util._native import compression, hash
 
-__all__ = ["compression"]
+__all__ = ["compression", "hash"]

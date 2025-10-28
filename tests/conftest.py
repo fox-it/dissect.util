@@ -24,24 +24,33 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def _native_or_python(name: str, request: pytest.FixtureRequest) -> ModuleType:
-    from dissect.util import compression
-
+def _native_or_python(module: ModuleType, name: str, request: pytest.FixtureRequest) -> ModuleType:
     if request.param:
-        if not (module := getattr(compression, f"{name}_native", None)):
+        if not (module := getattr(module, f"{name}_native", None)):
             (pytest.fail if request.config.getoption("--force-native") else pytest.skip)(
                 "_native module is unavailable"
             )
 
         return module
-    return getattr(compression, f"{name}_python", None)
+    return getattr(module, f"{name}_python", None)
 
 
 @pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
 def lz4(request: pytest.FixtureRequest) -> ModuleType:
-    return _native_or_python("lz4", request)
+    from dissect.util import compression
+
+    return _native_or_python(compression, "lz4", request)
 
 
 @pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
 def lzo(request: pytest.FixtureRequest) -> ModuleType:
-    return _native_or_python("lzo", request)
+    from dissect.util import compression
+
+    return _native_or_python(compression, "lzo", request)
+
+
+@pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
+def crc32c(request: pytest.FixtureRequest) -> ModuleType:
+    from dissect.util import hash
+
+    return _native_or_python(hash, "crc32c", request)
