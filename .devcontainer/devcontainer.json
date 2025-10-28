@@ -1,7 +1,18 @@
 {
 	"name": "Dissect",
 	"image": "ghcr.io/fox-it/dissect-devcontainer",
-	"postCreateCommand": "pip3 install --user --editable . --config-settings editable_mode=compat"
+	"postCreateCommand": "uv sync",
+
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
+	// "remoteUser": "root",
+
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"rust-analyzer.linkedProjects": [
+					"dissect/util/_native.src/Cargo.toml"
+				]
+			}
+		}
+	}
 }
