@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from dissect.util.ldap import (
-    OPTIMIZER_ATTR_WEIGHTS,
+    _ATTRIBUTE_WEIGHTS,
     ComparisonOperator,
     InvalidQueryError,
     LogicalOperator,
@@ -475,7 +475,7 @@ def test_optimizer_fallback_case() -> None:
 
     # This should hit the fallback case
     _, weight = optimize_ldap_query(obj)
-    assert weight == max(OPTIMIZER_ATTR_WEIGHTS.values())
+    assert weight == max(_ATTRIBUTE_WEIGHTS.values())
 
 
 def test_extended_matching_rules() -> None:
