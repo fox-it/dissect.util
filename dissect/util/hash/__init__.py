@@ -20,6 +20,7 @@ except (ImportError, AttributeError):
     crc32c_native = None
 
 __all__ = [
+    "crc32",
     "crc32c",
     "crc32c_native",
     "crc32c_python",

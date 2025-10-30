@@ -4,12 +4,17 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.util.hash.jenkins import lookup8, lookup8_quads
+from dissect.util.hash import crc32, jenkins
 
 if TYPE_CHECKING:
     from types import ModuleType
 
     from pytest_benchmark.fixture import BenchmarkFixture
+
+
+def test_crc32(crc32c: ModuleType) -> None:
+    assert crc32.crc32(b"123456789") == 0xCBF43926
+    assert crc32.crc32(b"123456789", polynomial=0x82F63B78) == crc32c.crc32c(b"123456789")
 
 
 @pytest.mark.parametrize(
@@ -43,24 +48,24 @@ def test_crc32c_benchmark(crc32c: ModuleType, benchmark: BenchmarkFixture) -> No
 def test_lookup8_remainder() -> None:
     ip = b"192.168.1.109"
     volume = b"/home/roel/nfstest"
-    h1 = lookup8(ip, 42)
-    h2 = lookup8(volume, h1)
+    h1 = jenkins.lookup8(ip, 42)
+    h2 = jenkins.lookup8(volume, h1)
     assert h2 == 5364432747070711354
 
 
 def test_lookup8_full() -> None:
-    h1 = lookup8(b"Het implementeren van hashfuncties in Python is lastiger dan je zou denken,", 42)
-    h2 = lookup8(b"met name door de ontbrekende ondersteuning voor unsigned integer arithmetic", h1)
+    h1 = jenkins.lookup8(b"Het implementeren van hashfuncties in Python is lastiger dan je zou denken,", 42)
+    h2 = jenkins.lookup8(b"met name door de ontbrekende ondersteuning voor unsigned integer arithmetic", h1)
     assert h2 == 2809036171121327430
 
 
 def test_lookup8_empty_key() -> None:
-    assert lookup8(b"", 666) == 8664614747486377173
+    assert jenkins.lookup8(b"", 666) == 8664614747486377173
 
 
 @pytest.mark.benchmark
 def test_lookup8_benchmark(benchmark: BenchmarkFixture) -> None:
-    benchmark(lookup8, b"hello, world!", 42)
+    benchmark(jenkins.lookup8, b"hello, world!", 42)
 
 
 def test_lookup8_quads() -> None:
@@ -74,10 +79,10 @@ def test_lookup8_quads() -> None:
         "0000000000000000000000000000000000000000000000000000000000000000"
         "0000000000000000000000000000000000000000000000000000000000000000"
     )
-    assert lookup8_quads(key, 42) == 0x68175B25629F42F4
+    assert jenkins.lookup8_quads(key, 42) == 0x68175B25629F42F4
 
 
 @pytest.mark.benchmark
 def test_lookup8_quads_benchmark(benchmark: BenchmarkFixture) -> None:
     key = b"a" * 256
-    benchmark(lookup8_quads, key, 42)
+    benchmark(jenkins.lookup8_quads, key, 42)
