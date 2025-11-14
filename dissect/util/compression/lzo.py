@@ -100,8 +100,11 @@ def decompress(src: bytes | BinaryIO, header: bool = True, buflen: int = -1) -> 
             length = 0
             dist = (src.read(1)[0] << 2) + (val >> 2) + 1
 
-        for _ in range(length + 2):
-            dst.append(dst[-dist])
+        remaining = length + 2
+        while remaining > 0:
+            match_size = min(remaining, dist)
+            dst += dst[-dist : (-dist + match_size) or None]
+            remaining -= match_size
 
         # State is often encoded in the last 2 bits of the value, and used in subsequent iterations
         state = length = val & 3

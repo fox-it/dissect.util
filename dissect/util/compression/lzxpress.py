@@ -71,7 +71,10 @@ def decompress(src: bytes | BinaryIO) -> bytes:
                 match_length += 7
             match_length += 3
 
-            for _ in range(match_length):
-                dst.append(dst[-match_offset])
+            remaining = match_length
+            while remaining > 0:
+                match_size = min(remaining, match_offset)
+                dst += dst[-match_offset : (-match_offset + match_size) or None]
+                remaining -= match_size
 
     return bytes(dst)

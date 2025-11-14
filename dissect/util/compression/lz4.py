@@ -80,8 +80,11 @@ def decompress(
         if len(dst) + match_len > uncompressed_size > 0:
             raise CorruptDataError("Decompressed size exceeds uncompressed_size")
 
-        for _ in range(match_len):
-            dst.append(dst[-offset])
+        remaining = match_len
+        while remaining > 0:
+            match_size = min(remaining, offset)
+            dst += dst[-offset : (-offset + match_size) or None]
+            remaining -= match_size
 
         if len(dst) >= uncompressed_size > 0:
             break
