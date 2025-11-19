@@ -46,7 +46,7 @@ const _TABLE: [u32; 256] = [
 ///
 #[pyfunction]
 #[pyo3(signature = (crc, data))]
-fn update(py: Python<'_>, crc: u32, data: Vec<u8>) -> PyResult<PyObject> {
+fn update(py: Python<'_>, crc: u32, data: Vec<u8>) -> PyResult<Py<PyAny>> {
     let mut crc = crc ^ 0xFFFFFFFF;
     for &b in &data {
         crc = _TABLE[((crc ^ b as u32) & 0xFF) as usize] ^ ((crc >> 8) & 0xFFFFFFFF);
@@ -65,7 +65,7 @@ fn update(py: Python<'_>, crc: u32, data: Vec<u8>) -> PyResult<PyObject> {
 ///
 #[pyfunction]
 #[pyo3(signature = (data, value=0))]
-fn crc32c(py: Python<'_>, data: Vec<u8>, value: u32) -> PyResult<PyObject> {
+fn crc32c(py: Python<'_>, data: Vec<u8>, value: u32) -> PyResult<Py<PyAny>> {
     update(py, value, data)
 }
 
