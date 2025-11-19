@@ -225,8 +225,12 @@ def decompress(src: bytes | BinaryIO) -> bytes:
         if M is not None:
             if len(dst) < D or D == 0:
                 raise ValueError("Invalid match distance")
-            for _ in range(M):
-                dst.append(dst[-D])
+
+            remaining = M
+            while remaining > 0:
+                match_size = min(remaining, D)
+                dst += dst[-D : (-D + match_size) or None]
+                remaining -= match_size
 
     return bytes(dst)
 

@@ -172,8 +172,13 @@ def decompress(src: bytes | BinaryIO) -> bytes:
                 bitstring.skip(symbol)
 
                 length += 3
-                for _ in range(length):
-                    dst.append(dst[-offset])
+
+                remaining = length
+                while remaining > 0:
+                    match_size = min(remaining, offset)
+                    dst += dst[-offset : (-offset + match_size) or None]
+                    remaining -= match_size
+
                 chunk_size += length
 
     return bytes(dst)
