@@ -84,8 +84,12 @@ def id_fn(val: bytes | str) -> str:
     ],
     ids=id_fn,
 )
-def test_read_sid(binary_sid: bytes | BinaryIO, endian: str, swap_last: bool, readable_sid: str) -> None:
+def test_read_write_sid(binary_sid: bytes | BinaryIO, endian: str, swap_last: bool, readable_sid: str) -> None:
     assert readable_sid == sid.read_sid(binary_sid, endian, swap_last)
+
+    if isinstance(binary_sid, io.BytesIO):
+        binary_sid = binary_sid.getvalue()
+    assert binary_sid == sid.write_sid(readable_sid, endian, swap_last)
 
 
 @pytest.mark.benchmark
@@ -105,66 +109,6 @@ def test_read_sid(binary_sid: bytes | BinaryIO, endian: str, swap_last: bool, re
 )
 def test_read_sid_benchmark(benchmark: BenchmarkFixture, binary_sid: bytes, swap_last: bool) -> None:
     benchmark(sid.read_sid, binary_sid, "<", swap_last)
-
-
-@pytest.mark.parametrize(
-    ("binary_sid", "readable_sid", "endian", "swap_last"),
-    [
-        (
-            b"\x01\x00\x00\x00\x00\x00\x00\x00",
-            "S-1-0",
-            "<",
-            False,
-        ),
-        (
-            b"\x01\x01\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00",
-            "S-1-1-0",
-            "<",
-            False,
-        ),
-        (
-            b"\x01\x04\x00\x00\x00\x00\x00\x05\x15\x00\x00\x00\x15\xcd\x5b\x07\x00\x00\x00\x10\xf4\x01\x00\x00",
-            "S-1-5-21-123456789-268435456-500",
-            "<",
-            False,
-        ),
-        (
-            io.BytesIO(b"\x01\x01\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00"),
-            "S-1-1-0",
-            "<",
-            False,
-        ),
-        (
-            b"\x01\x04\x00\x00\x00\x00\x00\x05\x00\x00\x00\x15\x07\x5b\xcd\x15\x10\x00\x00\x00\x00\x00\x01\xf4",
-            "S-1-5-21-123456789-268435456-500",
-            ">",
-            False,
-        ),
-        (
-            b"\x01\x04\x00\x00\x00\x00\x00\x05\x15\x00\x00\x00\x15\xcd\x5b\x07\x00\x00\x00\x10\x00\x00\x01\xf4",
-            "S-1-5-21-123456789-268435456-500",
-            "<",
-            True,
-        ),
-        (
-            b"\x01\x04\x00\x00\x00\x00\x00\x05\x00\x00\x00\x15\x07\x5b\xcd\x15\x10\x00\x00\x00\xf4\x01\x00\x00",
-            "S-1-5-21-123456789-268435456-500",
-            ">",
-            True,
-        ),
-        (
-            b"",
-            "",
-            "<",
-            False,
-        ),
-    ],
-    ids=id_fn,
-)
-def test_write_sid(readable_sid: str, endian: str, swap_last: bool, binary_sid: bytes) -> None:
-    if isinstance(binary_sid, io.BytesIO):
-        binary_sid = binary_sid.getvalue()
-    assert binary_sid == sid.write_sid(readable_sid, endian, swap_last)
 
 
 @pytest.mark.benchmark
