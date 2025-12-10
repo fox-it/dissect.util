@@ -63,7 +63,7 @@ def write_sid(sid_str: str, endian: str = "<", swap_last: bool = False) -> bytes
 
     parts = sid_str.split("-")
     if len(parts) < 3 or parts[0].upper() != "S":
-        raise ValueError("Invalid SID string")
+        return b""
 
     revision = int(parts[1]).to_bytes(1, "little")
     authority = int(parts[2]).to_bytes(6, "big")
