@@ -48,3 +48,34 @@ def read_sid(fh: BinaryIO | bytes, endian: str = "<", swap_last: bool = False) -
     ]
     sid_elements.extend(map(str, sub_authorities))
     return "-".join(sid_elements)
+
+
+def write_sid(sid: str, endian: str = "<", swap_last: bool = False) -> bytes:
+    """Write a Windows SID string to bytes.
+
+    Args:
+        sid: SID in the form ``S-Revision-Authority-SubAuth1-...``.
+        endian: Optional endianness for reading the sub authorities.
+        swap_last: Optional flag for swapping the endianess of the _last_ sub authority entry.
+    """
+    if not sid:
+        return b""
+
+    parts = sid.split("-")
+    if len(parts) < 3 or parts[0].upper() != "S":
+        raise ValueError("Invalid SID string format: insufficient parts")
+
+    revision = int(parts[1]).to_bytes(1, "little")
+    authority = int(parts[2]).to_bytes(6, "big")
+    sub_authorities = [int(x) for x in parts[3:]]
+
+    header = revision + len(sub_authorities).to_bytes(1, "little") + authority
+
+    if not sub_authorities:
+        return header
+
+    sub_bytes = bytearray(struct.pack(f"{endian}{len(sub_authorities)}I", *sub_authorities))
+    if swap_last:
+        sub_bytes[-4:] = sub_bytes[-4:][::-1]
+
+    return header + bytes(sub_bytes)
