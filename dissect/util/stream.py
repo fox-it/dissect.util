@@ -669,3 +669,104 @@ class ZlibStream(AlignedStream):
             chunks.append(data)
 
         return b"".join(chunks)
+
+
+class BitStream:
+    """Bit-level stream reader.
+
+    Args:
+        fh: File-like object to read bits from.
+    """
+
+    def __init__(self, fh: BinaryIO):
+        self.fh = fh
+        self._byte_offset = fh.tell()
+
+        self.buffer = 0
+        self.bits = 0
+
+    def readable(self) -> bool:
+        """Indicate that the stream is readable."""
+        return True
+
+    def seekable(self) -> bool:
+        """Indicate that the stream is seekable."""
+        return True
+
+    def writable(self) -> bool:
+        """Indicate that the stream is not writable."""
+        return False
+
+    def seek(self, pos: int, whence: int = io.SEEK_SET) -> int:
+        """Seek the stream to the specified position in bits.
+
+        Returns:
+            The new stream position after seeking.
+        """
+        if whence == io.SEEK_SET:
+            byte_pos, bit_pos = divmod(pos, 8)
+        elif whence == io.SEEK_CUR:
+            current_pos = self.tell()
+            byte_pos, bit_pos = divmod(current_pos + pos, 8)
+        elif whence == io.SEEK_END:
+            self.fh.seek(0, io.SEEK_END)
+            end_pos = self.fh.tell() * 8
+            byte_pos, bit_pos = divmod(end_pos + pos, 8)
+        else:
+            raise IOError("invalid whence value")
+
+        self._byte_offset = byte_pos
+        self.bits = 0
+        self.buffer = 0
+
+        if bit_pos > 0:
+            self.read(bit_pos)
+
+        return self.tell()
+
+    def tell(self) -> int:
+        """Get the current position in the stream in bits."""
+        return (self._byte_offset * 8) - self.bits
+
+    def read(self, n: int) -> int:
+        """Read n bits from the stream.
+
+        Args:
+            n: Number of bits to read.
+        """
+        value = self.peek(n)
+        self.remove(n)
+        return value
+
+    def peek(self, n: int) -> int:
+        """Peek n bits from the stream without advancing.
+
+        Args:
+            n: Number of bits to peek.
+        """
+        if n == 0:
+            return 0
+
+        if n > self.bits:
+            while self.bits < n:
+                num_bytes = (n - self.bits + 7) // 8
+                self.fh.seek(self._byte_offset)
+                if not (buf := self.fh.read(num_bytes)):
+                    break
+
+                new_bits = int.from_bytes(buf, "big")
+                num_new_bits = len(buf) * 8
+                self.buffer = (self.buffer << num_new_bits) | new_bits
+                self.bits += num_new_bits
+                self._byte_offset += len(buf)
+
+        return self.buffer >> (self.bits - min(n, self.bits))
+
+    def remove(self, n: int) -> None:
+        """Remove n bits from the stream.
+
+        Args:
+            n: Number of bits to remove.
+        """
+        self.bits -= min(n, self.bits)
+        self.buffer &= (1 << (self.bits)) - 1
