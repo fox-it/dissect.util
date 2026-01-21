@@ -225,6 +225,67 @@ def test_zlib_stream() -> None:
     assert fh.read() == data
 
 
+def test_bitstream() -> None:
+    """Test for correct bit reading behavior."""
+    data = bytes([0b10101010, 0b11001100, 0b11110000, 0b00001111, 0b11111111, 0b00000000, 0b10101010, 0b01010101])
+    fh = io.BytesIO(data)
+    bitstream = stream.BitStream(fh)
+
+    assert bitstream.peek(4) == 0b1010
+    assert bitstream.tell() == 0
+
+    assert bitstream.peek(4) == 0b1010
+    assert bitstream.tell() == 0
+
+    assert bitstream.read(4) == 0b1010
+    assert bitstream.tell() == 4
+
+    assert bitstream.peek(8) == 0b10101100
+    assert bitstream.tell() == 4
+
+    assert bitstream.read(4) == 0b1010
+    assert bitstream.tell() == 8
+
+    assert bitstream.peek(8) == 0b11001100
+    assert bitstream.tell() == 8
+
+    assert bitstream.read(8) == 0b11001100
+    assert bitstream.tell() == 16
+
+    assert bitstream.peek(4) == 0b1111
+    assert bitstream.tell() == 16
+
+    bitstream.remove(4)
+    assert bitstream.tell() == 20
+
+    assert bitstream.peek(4) == 0b0000
+    assert bitstream.tell() == 20
+
+    assert bitstream.read(8) == 0b00000000
+    assert bitstream.tell() == 28
+
+    assert bitstream.read(33) == 0b11111111_11110000_00001010_10100101_0
+    assert bitstream.tell() == 61
+
+    assert bitstream.seek(0) == 0
+    assert bitstream.peek(16) == 0b10101010_11001100
+
+    assert bitstream.seek(4, io.SEEK_CUR) == 4
+    assert bitstream.peek(8) == 0b10101100
+
+    assert bitstream.seek(-8, io.SEEK_END) == 56
+    assert bitstream.peek(8) == 0b01010101
+
+
+def test_bitstream_empty() -> None:
+    """Test reading from an empty bit stream."""
+    fh = io.BytesIO(b"")
+    bitstream = stream.BitStream(fh)
+
+    assert bitstream.peek(8) == 0
+    assert bitstream.read(8) == 0
+
+
 class NullStream(stream.AlignedStream):
     def __init__(self, size: int | None, align: int = stream.STREAM_BUFFER_SIZE):
         super().__init__(size)
