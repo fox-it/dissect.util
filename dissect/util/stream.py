@@ -547,7 +547,7 @@ class OverlayStream(AlignedStream):
             if length == 0:
                 break
 
-            if next_overlay_offset:
+            if next_overlay_offset is not None:
                 next_overlay_size, next_overlay_data = overlays[next_overlay_offset]
                 gap_to_next_overlay = next_overlay_offset - offset
 

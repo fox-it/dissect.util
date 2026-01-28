@@ -194,6 +194,22 @@ def test_overlay_stream() -> None:
     assert fh.read(100) == b"\x04" * 4
 
 
+def test_overlay_stream_add_at_offset_zero() -> None:
+    buf = io.BytesIO(b"\x00" * 100)
+    fh = stream.OverlayStream(buf, size=100)
+
+    # Add a small overlay at offset zero
+    fh.add(0, b"MZ")
+
+    assert fh.read(2) == b"MZ"
+
+    fh.seek(0)
+    assert fh.read(100) == b"MZ" + (b"\x00" * 98)
+
+    fh.seek(0)
+    assert fh.read() == b"MZ" + (b"\x00" * 98)
+
+
 def test_zlib_stream() -> None:
     data = b"\x01" * 8192 + b"\x02" * 8192 + b"\x03" * 8192 + b"\x04" * 8192
     fh = stream.ZlibStream(io.BytesIO(zlib.compress(data)), size=8192 * 4, align=512)
