@@ -79,7 +79,6 @@ def decompress(src: bytes | BinaryIO) -> bytes:
 
     opc_len = 0
 
-    # ruff: noqa: N806
     L = None
     M = None
     D = 0

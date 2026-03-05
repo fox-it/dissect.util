@@ -365,7 +365,6 @@ def _decode_lmd(
 
     lit = io.BytesIO(bytes(literals))
 
-    # ruff: noqa: N806
     L = 0
     M = 0
     D = None
