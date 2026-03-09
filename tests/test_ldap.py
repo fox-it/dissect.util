@@ -431,7 +431,7 @@ def test_format_with_all_operators(expected: str, attribute: str, op: str, value
 
 def test_error_no_comparison_operator() -> None:
     """Test error for missing comparison operator."""
-    with pytest.raises(InvalidQueryError, match="No comparison operator found in query: .+ Expected one of .*"):
+    with pytest.raises(InvalidQueryError, match=r"No comparison operator found in query: .+ Expected one of .*"):
         SearchFilter.parse("(attributename)", optimize=False)
 
 
