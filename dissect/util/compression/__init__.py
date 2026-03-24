@@ -23,8 +23,8 @@ lzo_python = lzo
 try:
     from dissect.util import _native
 
-    lz4 = lz4_native = _native.compression.lz4
-    lzo = lzo_native = _native.compression.lzo
+    lz4 = lz4_native = _native.compression.lz4  # type: ignore
+    lzo = lzo_native = _native.compression.lzo  # type: ignore
 except (ImportError, AttributeError):
     lz4_native = lzo_native = None
 

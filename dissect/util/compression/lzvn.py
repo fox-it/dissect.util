@@ -56,7 +56,7 @@ OP_UDEF = (
 _H = struct.Struct("<H")
 
 
-def decompress(src: bytes | BinaryIO) -> bytes:
+def decompress(src: bytes | bytearray | memoryview | BinaryIO) -> bytes:
     """LZVN decompress from a file-like object or bytes.
 
     Decompresses until EOF or EOS of the input data.
@@ -67,7 +67,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, bytes | bytearray | memoryview):
         src = io.BytesIO(src)
 
     offset = src.tell()
@@ -206,7 +206,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             if src_size < opc_len:
                 break
 
-            src_size -= opc_len + L
+            src_size -= opc_len
             break
 
         elif opc in OP_UDEF:

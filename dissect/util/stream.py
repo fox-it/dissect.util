@@ -6,7 +6,10 @@ import sys
 import zlib
 from bisect import bisect_left, bisect_right
 from threading import Lock
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
+
+if TYPE_CHECKING:
+    from _typeshed import WriteableBuffer
 
 STREAM_BUFFER_SIZE = int(os.getenv("DISSECT_STREAM_BUFFER_SIZE", io.DEFAULT_BUFFER_SIZE))
 
@@ -43,7 +46,7 @@ class AlignedStream(io.RawIOBase):
         self._pos = 0
         self._pos_align = 0
 
-        self._buf = None
+        self._buf = b""
         self._lock = Lock()
 
     def readable(self) -> bool:
@@ -88,7 +91,7 @@ class AlignedStream(io.RawIOBase):
 
         if self._pos_align != new_pos_align:
             self._pos_align = new_pos_align
-            self._buf = None
+            self._buf = b""
 
         self._pos = pos
 
@@ -166,16 +169,19 @@ class AlignedStream(io.RawIOBase):
             # Misaligned remaining bytes
             if n > 0:
                 self._fill_buf()
+
                 r.append(self._buf[:n])
                 self._set_pos(self._pos + n)
 
             return b"".join(r)
 
-    def readinto(self, b: bytearray) -> int:
+    def readinto(self, b: WriteableBuffer) -> int:
         """Read bytes into a pre-allocated bytes-like object b.
 
         Returns an int representing the number of bytes read (0 for EOF).
         """
+        b = memoryview(b)
+
         buf = self.read(len(b))
         length = len(buf)
         b[:length] = buf
@@ -294,6 +300,8 @@ class MappingStream(AlignedStream):
         align: The alignment size.
     """
 
+    size: int
+
     def __init__(self, size: int | None = None, align: int = STREAM_BUFFER_SIZE):
         super().__init__(size, align)
         self._runs: list[tuple[int, int, BinaryIO, int]] = []
@@ -311,10 +319,10 @@ class MappingStream(AlignedStream):
         """
         self._runs.append((offset, size, fh, file_offset))
         self._runs = sorted(self._runs, key=lambda run: run[0])
-        self._buf = None
+        self._buf = b""
         self.size = self._runs[-1][0] + self._runs[-1][1]
 
-    def _get_run_idx(self, offset: int) -> tuple[int, int, BinaryIO, int]:
+    def _get_run_idx(self, offset: int) -> int:
         """Find a mapping run for a given offset.
 
         Args:
@@ -333,7 +341,7 @@ class MappingStream(AlignedStream):
         raise EOFError(f"No mapping for offset {offset}")
 
     def _read(self, offset: int, length: int) -> bytes:
-        result = []
+        result: list[bytes] = []
 
         run_idx = self._get_run_idx(offset)
         runlist_len = len(self._runs)
@@ -384,8 +392,10 @@ class RunlistStream(AlignedStream):
         align: Optional alignment that differs from the block size, otherwise ``block_size`` is used as alignment.
     """
 
+    size: int
+
     def __init__(
-        self, fh: BinaryIO, runlist: list[tuple[int, int]], size: int, block_size: int, align: int | None = None
+        self, fh: BinaryIO, runlist: list[tuple[int | None, int]], size: int, block_size: int, align: int | None = None
     ):
         super().__init__(size, align or block_size)
 
@@ -401,13 +411,13 @@ class RunlistStream(AlignedStream):
         self.block_size = block_size
 
     @property
-    def runlist(self) -> list[tuple[int, int]]:
+    def runlist(self) -> list[tuple[int | None, int]]:
         return self._runlist
 
     @runlist.setter
-    def runlist(self, runlist: list[tuple[int, int]]) -> None:
+    def runlist(self, runlist: list[tuple[int | None, int]]) -> None:
         self._runlist = runlist
-        self._runlist_offsets = []
+        self._runlist_offsets: list[int] = []
 
         offset = 0
         # Create a list of starting offsets for each run so we can bisect that quickly when reading
@@ -416,10 +426,10 @@ class RunlistStream(AlignedStream):
                 self._runlist_offsets.append(offset)
             offset += block_count
 
-        self._buf = None
+        self._buf = b""
 
     def _read(self, offset: int, length: int) -> bytes:
-        r = []
+        r: list[bytes] = []
 
         block_offset = offset // self.block_size
 
@@ -479,7 +489,9 @@ class OverlayStream(AlignedStream):
         self.overlays: dict[int, tuple[int, BinaryIO]] = {}
         self._lookup: list[int] = []
 
-    def add(self, offset: int, data: bytes | BinaryIO, size: int | None = None) -> None:
+    def add(
+        self, offset: int, data: bytes | bytearray | memoryview | BinaryIO, size: int | None = None
+    ) -> OverlayStream:
         """Add an overlay at the given offset.
 
         Args:
@@ -487,14 +499,14 @@ class OverlayStream(AlignedStream):
             data: The bytes or file-like object to overlay.
             size: Optional size specification of the overlay, if it can't be inferred.
         """
-        if not hasattr(data, "read"):
+        if isinstance(data, bytes | bytearray | memoryview):
             size = size or len(data)
             data = io.BytesIO(data)
         elif size is None:
-            size = data.size if hasattr(data, "size") else data.seek(0, io.SEEK_END)
+            size = getattr(data, "size", None) or data.seek(0, io.SEEK_END)
 
         if not size:
-            return None
+            return self
 
         if size < 0:
             raise ValueError("Size must be positive")
@@ -510,12 +522,12 @@ class OverlayStream(AlignedStream):
 
         # Clear the buffer if we add an overlay at our current position
         if self._buf and (self._pos_align <= offset + size and offset <= self._pos_align + len(self._buf)):
-            self._buf = None
+            self._buf = b""
 
         return self
 
     def _read(self, offset: int, length: int) -> bytes:
-        result = []
+        result: list[bytes] = []
 
         fh = self._fh
         overlays = self.overlays
@@ -590,21 +602,30 @@ class ZlibStream(AlignedStream):
         size: The size the stream should be.
     """
 
-    def __init__(self, fh: BinaryIO, size: int | None = None, align: int = STREAM_BUFFER_SIZE, **kwargs):
+    def __init__(
+        self,
+        fh: BinaryIO,
+        size: int | None = None,
+        align: int = STREAM_BUFFER_SIZE,
+        *,
+        wbits: int = 15,
+        zdict: bytes = b"",
+    ):
         self._fh = fh
 
-        self._zlib = None
-        self._zlib_args = kwargs
+        self._fh.seek(0)
+        self._zlib_wbits = wbits
+        self._zlib_zdict = zdict
+        self._zlib = zlib.decompressobj(wbits=self._zlib_wbits, zdict=self._zlib_zdict)
         self._zlib_offset = 0
         self._zlib_prepend = b""
         self._zlib_prepend_offset = None
-        self._rewind()
 
         super().__init__(size, align)
 
     def _rewind(self) -> None:
         self._fh.seek(0)
-        self._zlib = zlib.decompressobj(**self._zlib_args)
+        self._zlib = zlib.decompressobj(wbits=self._zlib_wbits, zdict=self._zlib_zdict)
         self._zlib_offset = 0
         self._zlib_prepend = b""
         self._zlib_prepend_offset = None
@@ -635,7 +656,7 @@ class ZlibStream(AlignedStream):
         if length < 0:
             return self.readall()
 
-        result = []
+        result: list[bytes] = []
         while length > 0:
             buf = self._read_fh(io.DEFAULT_BUFFER_SIZE)
             decompressed = self._zlib.decompress(buf, length)
@@ -661,7 +682,7 @@ class ZlibStream(AlignedStream):
     def readall(self) -> bytes:
         self._seek_zlib(self.tell())
 
-        chunks = []
+        chunks: list[bytes] = []
         # sys.maxsize means the max length of output buffer is unlimited,
         # so that the whole input buffer can be decompressed within one
         # .decompress() call.

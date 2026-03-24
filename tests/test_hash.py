@@ -9,7 +9,7 @@ from dissect.util.hash import crc32, jenkins
 if TYPE_CHECKING:
     from types import ModuleType
 
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore
 
 
 def test_crc32(crc32c: ModuleType) -> None:

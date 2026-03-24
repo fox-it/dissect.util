@@ -40,6 +40,7 @@ test = [
 lint = [
     "ruff==0.12.12",
     "vermin",
+    "ty",
 ]
 build = [
     "build",

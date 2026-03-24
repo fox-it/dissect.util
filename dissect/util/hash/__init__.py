@@ -15,7 +15,7 @@ crc32c_python = crc32c
 try:
     from dissect.util import _native
 
-    crc32c = crc32c_native = _native.hash.crc32c
+    crc32c = crc32c_native = _native.hash.crc32c  # type: ignore
 except (ImportError, AttributeError):
     crc32c_native = None
 

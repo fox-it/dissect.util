@@ -8,10 +8,10 @@ import pytest
 from dissect.util import sid
 
 if TYPE_CHECKING:
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore
 
 
-def id_fn(val: bytes | str) -> str:
+def id_fn(val: bytes | str | None) -> str:
     if isinstance(val, io.BytesIO):
         val = val.getvalue()
 

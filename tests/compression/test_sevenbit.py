@@ -7,7 +7,7 @@ import pytest
 from dissect.util.compression import sevenbit
 
 if TYPE_CHECKING:
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore
 
 
 def test_sevenbit_compress() -> None:

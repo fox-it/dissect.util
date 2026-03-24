@@ -1,7 +1,7 @@
 from struct import unpack
 
 
-def _mix64(a: int, b: int, c: int) -> int:
+def _mix64(a: int, b: int, c: int) -> tuple[int, int, int]:
     """Mixes three 64-bit values reversibly."""
     # Implement logical right shift by masking first
     a = (a - b - c) ^ ((c & 0xFFFFFFFFFFFFFFFF) >> 43)

@@ -19,10 +19,10 @@ def _read_16_bit(fh: BinaryIO) -> int:
 class Node:
     __slots__ = ("children", "is_leaf", "symbol")
 
-    def __init__(self, symbol: Symbol | None = None, is_leaf: bool = False):
+    def __init__(self, symbol: int = 0, is_leaf: bool = False):
         self.symbol = symbol
         self.is_leaf = is_leaf
-        self.children = [None, None]
+        self.children: dict[int, Node] = {}
 
 
 def _add_leaf(nodes: list[Node], idx: int, mask: int, bits: int) -> int:
@@ -32,7 +32,7 @@ def _add_leaf(nodes: list[Node], idx: int, mask: int, bits: int) -> int:
     while bits > 1:
         bits -= 1
         childidx = (mask >> bits) & 1
-        if node.children[childidx] is None:
+        if childidx not in node.children:
             node.children[childidx] = nodes[i]
             nodes[i].is_leaf = False
             i += 1
@@ -84,24 +84,28 @@ def _build_tree(buf: bytes) -> Node:
 
 
 class BitString:
-    def __init__(self):
-        self.source = None
+    def __init__(self, fh: BinaryIO):
+        self.fh = fh
         self.mask = 0
         self.bits = 0
 
     @property
     def index(self) -> int:
-        return self.source.tell()
+        return self.fh.tell()
 
-    def init(self, fh: BinaryIO) -> None:
-        self.mask = (_read_16_bit(fh) << 16) + _read_16_bit(fh)
+    def reset(self) -> None:
+        self.mask = (_read_16_bit(self.fh) << 16) + _read_16_bit(self.fh)
         self.bits = 32
-        self.source = fh
 
     def read(self, n: int) -> bytes:
-        return self.source.read(n)
+        return self.fh.read(n)
 
-    def lookup(self, n: int) -> int:
+    def take(self, n: int) -> int:
+        value = self.peek(n)
+        self.skip(n)
+        return value
+
+    def peek(self, n: int) -> int:
         if n == 0:
             return 0
 
@@ -111,19 +115,19 @@ class BitString:
         self.mask = (self.mask << n) & 0xFFFFFFFF
         self.bits -= n
         if self.bits < 16:
-            self.mask += _read_16_bit(self.source) << (16 - self.bits)
+            self.mask += _read_16_bit(self.fh) << (16 - self.bits)
             self.bits += 16
 
-    def decode(self, root: Node) -> Symbol:
+    def decode(self, root: Node) -> int:
         node = root
         while not node.is_leaf:
-            bit = self.lookup(1)
-            self.skip(1)
+            bit = self.take(1)
             node = node.children[bit]
+
         return node.symbol
 
 
-def decompress(src: bytes | BinaryIO) -> bytes:
+def decompress(src: bytes | bytearray | memoryview | BinaryIO) -> bytes:
     """LZXPRESS decompress from a file-like object or bytes.
 
     Decompresses until EOF of the input data.
@@ -134,7 +138,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     Returns:
         The decompressed data.
     """
-    if not hasattr(src, "read"):
+    if isinstance(src, bytes | bytearray | memoryview):
         src = io.BytesIO(src)
 
     dst = bytearray()
@@ -144,11 +148,11 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     size = src.tell() - start_offset
     src.seek(start_offset, io.SEEK_SET)
 
-    bitstring = BitString()
+    bitstring = BitString(src)
 
     while src.tell() - start_offset < size:
         root = _build_tree(src.read(256))
-        bitstring.init(src)
+        bitstring.reset()
 
         chunk_size = 0
         while chunk_size < 65536 and src.tell() - start_offset < size:
@@ -161,13 +165,13 @@ def decompress(src: bytes | BinaryIO) -> bytes:
                 length = symbol & 0x0F
                 symbol >>= 4
 
-                offset = (1 << symbol) + bitstring.lookup(symbol)
+                offset = (1 << symbol) + bitstring.peek(symbol)
 
                 if length == 15:
                     length = ord(bitstring.read(1)) + 15
 
                     if length == 270:
-                        length = _read_16_bit(bitstring.source)
+                        length = _read_16_bit(bitstring.fh)
 
                 bitstring.skip(symbol)
 
