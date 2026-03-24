@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 import importlib.util
-from types import ModuleType
+import typing
 
 import pytest
+
+if typing.TYPE_CHECKING:
+    from types import ModuleType
 
 HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
