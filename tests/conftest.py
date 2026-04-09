@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import typing
 
 import pytest
@@ -32,9 +33,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 def _native_or_python(module: ModuleType, name: str, request: pytest.FixtureRequest) -> ModuleType:
     if request.param:
         if not (module := getattr(module, f"{name}_native", None)):
-            (pytest.fail if request.config.getoption("--force-native") else pytest.skip)(
-                "_native module is unavailable"
-            )
+            force = request.config.getoption("--force-native") or bool(os.environ.get("DISSECT_FORCE_NATIVE"))
+            (pytest.fail if force else pytest.skip)("_native module is unavailable")
 
         return module
     return getattr(module, f"{name}_python", None)
