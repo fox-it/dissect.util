@@ -77,7 +77,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             offset = _I.unpack(src.read(4))[0]
 
         dst_offset = dst.tell() - offset
-        buf = dst.getbuffer()[dst_offset : dst_offset + length].tobytes()
+        buf = dst.getvalue()[dst_offset : dst_offset + length]
         if offset - length <= 0:
             buf = (buf * ((length // len(buf)) + 1))[:length]
 
