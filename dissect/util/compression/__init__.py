@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.util.compression import lz4, lzo
 
 lz4_python = lz4

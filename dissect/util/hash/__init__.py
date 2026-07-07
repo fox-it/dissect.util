@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.util.hash import crc32c
 
 crc32c_python = crc32c

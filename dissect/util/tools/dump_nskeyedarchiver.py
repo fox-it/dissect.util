@@ -29,7 +29,7 @@ def print_object(obj: Any, indent: int = 0, seen: set | None = None) -> None:
         if obj in seen:
             print(fmt(f"Recursive -> {obj}", indent))
             return
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     if isinstance(obj, list):

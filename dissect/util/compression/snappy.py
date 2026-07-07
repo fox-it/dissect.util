@@ -77,7 +77,13 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             offset = _I.unpack(src.read(4))[0]
 
         dst_offset = dst.tell() - offset
-        buf = dst.getbuffer()[dst_offset : dst_offset + length].tobytes()
+        dst_view = dst.getbuffer()
+        try:
+            buf = dst_view[dst_offset : dst_offset + length].tobytes()
+        finally:
+            # Release the view before writing; BytesIO cannot be resized while a memoryview is active
+            # Reference: https://docs.python.org/3/library/stdtypes.html#memoryview.release
+            dst_view.release()
         if offset - length <= 0:
             buf = (buf * ((length // len(buf)) + 1))[:length]
 

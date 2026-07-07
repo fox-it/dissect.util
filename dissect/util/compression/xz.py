@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 from binascii import crc32
 from typing import BinaryIO

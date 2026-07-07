@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import importlib.util
-from types import ModuleType
+import os
+import typing
 
 import pytest
+
+if typing.TYPE_CHECKING:
+    from types import ModuleType
 
 HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
@@ -27,9 +33,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 def _native_or_python(module: ModuleType, name: str, request: pytest.FixtureRequest) -> ModuleType:
     if request.param:
         if not (module := getattr(module, f"{name}_native", None)):
-            (pytest.fail if request.config.getoption("--force-native") else pytest.skip)(
-                "_native module is unavailable"
-            )
+            force = request.config.getoption("--force-native") or bool(os.environ.get("DISSECT_FORCE_NATIVE"))
+            (pytest.fail if force else pytest.skip)("_native module is unavailable")
 
         return module
     return getattr(module, f"{name}_python", None)
