@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.util.hash import crc32, jenkins
+from dissect.util.hash import crc32, crc64, jenkins
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -43,6 +43,28 @@ def test_crc32c(crc32c: ModuleType, data: bytes, value: int, expected: int) -> N
 @pytest.mark.benchmark
 def test_crc32c_benchmark(crc32c: ModuleType, benchmark: BenchmarkFixture) -> None:
     benchmark(crc32c.crc32c, b"hello, world!", 0)
+
+
+@pytest.mark.parametrize(
+    ("data", "value", "expected"),
+    [
+        # CRC-64/NVME check value (reveng.sourceforge.io CRC catalogue)
+        (b"123456789", 0, 0xAE8B14860A799888),
+        (b"", 0, 0),
+        (b"hello, world!", 0, 0xF8046E40C403F1D0),
+        (b"hello, world!", 0x12345678, 0x080A99F5C71E0576),
+        (b"\x00" * 32, 0, 0xCF3473434D4ECF3B),
+        (b"\xff" * 32, 0, 0xA0A06974C34D63C4),
+        (bytes(range(32)), 0, 0xB9D9D4A8492CBD7F),
+    ],
+)
+def test_crc64(data: bytes, value: int, expected: int) -> None:
+    assert crc64(data, value) == expected
+
+
+@pytest.mark.benchmark
+def test_crc64_benchmark(benchmark: BenchmarkFixture) -> None:
+    benchmark(crc64, b"hello, world!", 0)
 
 
 def test_lookup8_remainder() -> None:
