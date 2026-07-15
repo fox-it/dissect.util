@@ -42,12 +42,37 @@ PARAMS = (
 )
 
 
+INPUT = b"the quick brown fox jumps over the lazy dog. " * 8
+COMPRESSED = (
+    "0100000074686520717569636b2062726f776e20666f78206a756d7073206f76657220f100ffff7f006c617a7920646f672e6a00"
+    "67010fff3401"
+)
+
+
 @pytest.mark.parametrize(*PARAMS)
 def test_lzxpress_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lzxpress.decompress(bytes.fromhex(data))).hexdigest() == digest
+
+
+def test_lzxpress_compress() -> None:
+    assert lzxpress.decompress(lzxpress.compress(INPUT)) == INPUT
+    assert lzxpress.compress(INPUT) == bytes.fromhex(COMPRESSED)
+
+
+def test_lzxpress_decompress_max_size() -> None:
+    compressed = lzxpress.compress(INPUT)
+    assert lzxpress.decompress(compressed, max_size=len(INPUT)) == INPUT
+
+    with pytest.raises(ValueError, match="max_size"):
+        lzxpress.decompress(compressed, max_size=10)
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzxpress_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lzxpress.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzxpress_compress(benchmark: BenchmarkFixture) -> None:
+    assert benchmark(lzxpress.compress, INPUT) == bytes.fromhex(COMPRESSED)
