@@ -1,3 +1,12 @@
+"""Compression algorithms: LZ4, LZO, LZNT1, LZXPRESS, DEFLATE, ZLIB, and others.
+
+Selects between native Rust implementations of LZ4 and LZO (when available
+via dissect.util._native) and pure-Python fallbacks. The native versions are
+exposed as ``lz4_native`` / ``lzo_native`` and the Python versions as
+``lz4_python`` / ``lzo_python``; importing ``lz4`` or ``lzo`` gives whichever
+is available, preferring native.
+"""
+
 from __future__ import annotations
 
 from dissect.util.compression import lz4, lzo
@@ -21,7 +30,7 @@ lzo_python = lzo
 # dissect.util.compression.lzo_python.
 #
 # Note that the pure Python implementation and the Rust implementation are NOT a full replacement
-# for the "official" lz4 and lzo Python packages: only the decompress() function is implemented.
+# for the "official" lz4 and lzo Python packages.
 try:
     from dissect.util import _native
 
@@ -31,6 +40,7 @@ except (ImportError, AttributeError):
     lz4_native = lzo_native = None
 
 __all__ = [
+    "deflate",
     "lz4",
     "lz4_native",
     "lz4_python",
@@ -42,6 +52,8 @@ __all__ = [
     "lzo_python",
     "lzvn",
     "lzxpress",
+    "lzxpress9",
     "lzxpress_huffman",
     "sevenbit",
+    "zlibstream",
 ]
