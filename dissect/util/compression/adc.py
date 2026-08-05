@@ -2,6 +2,7 @@
 # - https://github.com/Lekensteyn/dmg2img/blob/develop/adc.c
 from __future__ import annotations
 
+import io
 from typing import BinaryIO
 
 
@@ -14,29 +15,27 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     Returns:
         The decompressed data.
     """
-    if hasattr(src, "read"):
-        src = src.read()
+    if not hasattr(src, "read"):
+        src = io.BytesIO(src)
 
     dst = bytearray()
-    pos = 0
 
-    while pos < len(src):
-        byte = src[pos]
+    while _byte := src.read(1):
+        byte = _byte[0]
 
         if byte & 0x80:
             count = (byte & 0x7F) + 1
-            dst += src[pos + 1 : pos + 1 + count]
-            pos += 1 + count
+            dst.extend(src.read(count))
             continue
 
         if byte & 0x40:
             count = (byte & 0x3F) + 4
-            distance = (src[pos + 1] << 8) + src[pos + 2] + 1
-            pos += 3
+            extra = src.read(2)
+            distance = (extra[0] << 8) + extra[1] + 1
         else:
             count = ((byte & 0x3F) >> 2) + 3
-            distance = ((byte & 0x03) << 8) + src[pos + 1] + 1
-            pos += 2
+            extra = src.read(1)
+            distance = ((byte & 0x03) << 8) + extra[0] + 1
 
         if distance > len(dst):
             raise ValueError("Invalid match distance in ADC stream")
