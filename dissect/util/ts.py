@@ -295,6 +295,9 @@ def dostimestamp(ts: int, centiseconds: int = 0, swap: bool = False) -> datetime
     )
 
 
+_GOTIME = struct.Struct(">BQIh")
+
+
 def golangtimestamp(raw: bytes) -> datetime:
     """Unmarshal golang ``time.Time`` bytes to a :class:`datetime` object.
 
@@ -311,7 +314,7 @@ def golangtimestamp(raw: bytes) -> datetime:
     References:
         - https://pkg.go.dev/time
     """
-    _version, seconds, nanoseconds, offset = struct.unpack(">BQIh", raw)
+    _version, seconds, nanoseconds, offset = _GOTIME.unpack(raw)
 
     timestamp = seconds - 62_135_596_800
     tz = timezone.utc if offset == -1 else timezone(timedelta(minutes=offset))
