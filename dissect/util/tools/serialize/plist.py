@@ -1,24 +1,28 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
 from typing import Any
 
-from dissect.util.plist import NSKeyedArchiver, NSObject
+from dissect.util.serialize.plist import NSKeyedArchiver, NSObject
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("file", type=argparse.FileType("rb"), help="NSKeyedArchiver plist file to dump")
+    parser.add_argument("file", type=Path, help="NSKeyedArchiver plist file to dump")
     args = parser.parse_args()
 
-    with args.file as fh:
+    with args.file.open("rb") as fh:
         try:
             obj = NSKeyedArchiver(fh)
         except ValueError as e:
-            parser.exit(str(e))
+            print(e)
+            return 1
 
         print(obj)
         print_object(obj.top)
+    return 0
 
 
 def print_object(obj: Any, indent: int = 0, seen: set | None = None) -> None:
@@ -58,4 +62,4 @@ def fmt(obj: Any, indent: int) -> str:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
