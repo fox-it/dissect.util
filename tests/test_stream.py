@@ -71,6 +71,24 @@ def test_relative_stream() -> None:
     assert fh.read() == b"\x01" * 5 + b"\x02" * 10 + b"\x03" * 10
 
 
+def test_relative_stream_read_all_after_seek() -> None:
+    buf = io.BytesIO(bytes(range(32)))
+    fh = stream.RelativeStream(buf, 0)
+    assert fh.size is None
+
+    # Reading to the end must start at the current position, not at the aligned position
+    fh.seek(10)
+    assert fh.read() == bytes(range(10, 32))
+    assert fh.tell() == 32
+
+    # Same, but with the alignment buffer already filled by a previous read
+    fh.seek(0)
+    assert fh.read(4) == bytes(range(4))
+    fh.seek(10)
+    assert fh.read() == bytes(range(10, 32))
+    assert fh.tell() == 32
+
+
 def test_buffered_stream() -> None:
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512)
     fh = stream.BufferedStream(buf, size=None)
