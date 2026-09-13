@@ -6,7 +6,10 @@ import sys
 import zlib
 from bisect import bisect_left, bisect_right
 from threading import Lock
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
 
 STREAM_BUFFER_SIZE = int(os.getenv("DISSECT_STREAM_BUFFER_SIZE", io.DEFAULT_BUFFER_SIZE))
 
@@ -457,6 +460,88 @@ class RunlistStream(AlignedStream):
             offset += read_count
             length -= read_count
             run_idx += 1
+
+        return b"".join(r)
+
+
+class LookupStream(AlignedStream):
+    """Create a stream with on-demand run lookup.
+
+    Instead of providing a fully resolved runlist up front, subclasses can
+    override :meth:`_lookup` to resolve physical runs lazily while reading.
+    A ``lookup`` callable can also be passed directly.
+
+    Each yielded run is a ``(physical_offset, size)`` tuple. A ``physical_offset``
+    of ``None`` represents a sparse run of zero bytes.
+
+    Args:
+        fh: The source file-like object.
+        size: The size of the stream.
+        lookup: Optional callable with the same signature as :meth:`_lookup`.
+        align: Optional alignment size.
+    """
+
+    def __init__(
+        self,
+        fh: BinaryIO,
+        size: int,
+        lookup: Callable[[int, int], Iterator[tuple[int | None, int]]] | None = None,
+        align: int | None = None,
+    ):
+        super().__init__(size, align or STREAM_BUFFER_SIZE)
+
+        if isinstance(fh, LookupStream):
+            self._fh = fh._fh
+        else:
+            self._fh = fh
+
+        self._lookup_fn = lookup
+        self._lookup_gen: Iterator[tuple[int | None, int]] | None = None
+        self._lookup_pos: int | None = None
+
+    def _lookup(self, offset: int, length: int) -> Iterator[tuple[int | None, int]]:
+        if self._lookup_fn is None:
+            raise NotImplementedError(f"{type(self).__name__}._lookup is not implemented")
+
+        return self._lookup_fn(offset, length)
+
+    def _reset_lookup(self, offset: int, length: int) -> None:
+        self._lookup_gen = self._lookup(offset, length)
+        self._lookup_pos = offset
+
+    def _read(self, offset: int, length: int) -> bytes:
+        if length < 0:
+            length = self.size - offset
+
+        r = []
+        remaining = length
+
+        while remaining > 0:
+            # A new lookup is needed after seeking, or when the previous one ran out of runs
+            resolved = self._lookup_gen is not None and self._lookup_pos == offset
+            if not resolved:
+                self._reset_lookup(offset, remaining)
+
+            try:
+                physical_offset, run_size = next(self._lookup_gen)
+            except StopIteration:
+                self._lookup_gen = None
+                if not resolved:
+                    # A fresh lookup has no runs for this offset, so there is nothing left to read
+                    break
+                continue
+
+            read_count = min(remaining, run_size)
+
+            if physical_offset is None:
+                r.append(b"\x00" * read_count)
+            else:
+                self._fh.seek(physical_offset)
+                r.append(self._fh.read(read_count))
+
+            remaining -= read_count
+            offset += read_count
+            self._lookup_pos = offset
 
         return b"".join(r)
 
