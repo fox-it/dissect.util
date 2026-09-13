@@ -194,6 +194,24 @@ def test_overlay_stream() -> None:
     assert fh.read(100) == b"\x04" * 4
 
 
+def test_overlay_stream_no_size() -> None:
+    data = b"1234567890"
+    # Wrap in a BufferedReader, which raises OverflowError on absurdly large reads
+    overlay = stream.OverlayStream(io.BufferedReader(io.BytesIO(data)))
+
+    assert overlay.read(10) == data
+
+    overlay.seek(0)
+    assert overlay.read() == data
+
+
+def test_overlay_stream_no_size_overlay_past_end() -> None:
+    overlay = stream.OverlayStream(io.BufferedReader(io.BytesIO(b"1234567890")))
+    overlay.add(8, b"abcd")
+
+    assert overlay.read() == b"12345678abcd"
+
+
 def test_overlay_stream_add_at_offset_zero() -> None:
     buf = io.BytesIO(b"\x00" * 100)
     fh = stream.OverlayStream(buf, size=100)
