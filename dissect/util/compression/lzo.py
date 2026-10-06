@@ -103,11 +103,14 @@ def decompress(src: bytes | BinaryIO, header: bool = True, buflen: int = -1) -> 
         if dist > len(dst):
             raise ValueError("Invalid match distance")
 
-        remaining = length + 2
-        while remaining > 0:
-            match_size = min(remaining, dist)
-            dst += dst[-dist : (-dist + match_size) or None]
-            remaining -= match_size
+        match_len = length + 2
+        if match_len <= dist:
+            dst += dst[-dist : (-dist + match_len) or None]
+        else:
+            # The match overlaps the output it produces, so it repeats the last dist bytes
+            chunk = dst[-dist:]
+            dst += chunk * (match_len // dist)
+            dst += chunk[: match_len % dist]
 
         # State is often encoded in the last 2 bits of the value, and used in subsequent iterations
         state = length = val & 3

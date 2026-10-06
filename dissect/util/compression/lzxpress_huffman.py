@@ -176,11 +176,13 @@ def decompress(src: bytes | BinaryIO) -> bytes:
                 if offset > len(dst):
                     raise ValueError("Invalid match distance")
 
-                remaining = length
-                while remaining > 0:
-                    match_size = min(remaining, offset)
-                    dst += dst[-offset : (-offset + match_size) or None]
-                    remaining -= match_size
+                if length <= offset:
+                    dst += dst[-offset : (-offset + length) or None]
+                else:
+                    # The match overlaps the output it produces, so it repeats the last offset bytes
+                    chunk = dst[-offset:]
+                    dst += chunk * (length // offset)
+                    dst += chunk[: length % offset]
 
                 chunk_size += length
 
