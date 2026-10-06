@@ -56,6 +56,17 @@ def test_lzxpress_huffman_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lzxpress_huffman.decompress(bytes.fromhex(data))).hexdigest() == digest
 
 
+def test_lzxpress_huffman_decompress_invalid_distance() -> None:
+    # A Huffman table with two 1-bit codes: 0 for the literal 0x00 and 1 for a match at distance 1
+    table = bytearray(256)
+    table[0] = 0x01
+    table[128] = 0x01
+
+    # The bitstream starts with the match, which has nothing to refer back to yet
+    with pytest.raises(ValueError, match="Invalid match distance"):
+        lzxpress_huffman.decompress(bytes(table) + bytes.fromhex("0080000000000000"))
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzxpress_huffman_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:

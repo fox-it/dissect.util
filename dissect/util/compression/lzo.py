@@ -100,6 +100,9 @@ def decompress(src: bytes | BinaryIO, header: bool = True, buflen: int = -1) -> 
             length = 0
             dist = (src.read(1)[0] << 2) + (val >> 2) + 1
 
+        if dist > len(dst):
+            raise ValueError("Invalid match distance")
+
         remaining = length + 2
         while remaining > 0:
             match_size = min(remaining, dist)

@@ -173,6 +173,9 @@ def decompress(src: bytes | BinaryIO) -> bytes:
 
                 length += 3
 
+                if offset > len(dst):
+                    raise ValueError("Invalid match distance")
+
                 remaining = length
                 while remaining > 0:
                     match_size = min(remaining, offset)
