@@ -43,12 +43,34 @@ PARAMS = (
 )
 
 
+INPUT = b"the quick brown fox jumps over the lazy dog. " * 8
+COMPRESSED = (
+    "f01074686520717569636b2062726f776e20666f78206a756d7073206f766572201f00916c617a7920646f672e0e000f2d00ff2050"
+    "646f672e20"
+)
+
+
 @pytest.mark.parametrize(*PARAMS)
 def test_lz4_decompress(lz4: ModuleType, data: str, digest: str) -> None:
     assert hashlib.sha256(lz4.decompress(bytes.fromhex(data))).hexdigest() == digest
+
+
+def test_lz4_compress() -> None:
+    # Only the pure-Python codec implements compress(); the native one is decompress-only.
+    from dissect.util.compression import lz4_python
+
+    assert lz4_python.decompress(lz4_python.compress(INPUT), len(INPUT)) == INPUT
+    assert lz4_python.compress(INPUT) == bytes.fromhex(COMPRESSED)
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lz4_decompress(lz4: ModuleType, data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lz4.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lz4_compress(benchmark: BenchmarkFixture) -> None:
+    from dissect.util.compression import lz4_python
+
+    assert benchmark(lz4_python.compress, INPUT) == bytes.fromhex(COMPRESSED)

@@ -51,12 +51,55 @@ PARAMS = (
 )
 
 
+INPUT = b"the quick brown fox jumps over the lazy dog. " * 8
+COMPRESSED = (
+    "0000000000000000000000000000000003000000000000060000000000000000000000000000000000000000000000006066466666666636"
+    "6664465555050000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    "0000000000000000000000000000000005000000000000000000000000000000000000000000000000050000000000005000000000000000"
+    "0000000000000050000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    "000000000000000000000000000000000000000000000000000000000000000054ffb61ef0d85230c6fe0366eb7681cf2872f3afa27c3a32"
+    "4d5dcc660000ff3401"
+)
+
+
 @pytest.mark.parametrize(*PARAMS)
 def test_lzxpress_huffman_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lzxpress_huffman.decompress(bytes.fromhex(data))).hexdigest() == digest
+
+
+def test_lzxpress_huffman_compress() -> None:
+    assert lzxpress_huffman.decompress(lzxpress_huffman.compress(INPUT)) == INPUT
+    assert lzxpress_huffman.compress(INPUT) == bytes.fromhex(COMPRESSED)
+
+
+def test_lzxpress_huffman_decompress_max_size() -> None:
+    compressed = lzxpress_huffman.compress(INPUT)
+    assert lzxpress_huffman.decompress(compressed, max_size=len(INPUT)) == INPUT
+
+    with pytest.raises(ValueError, match="limit"):
+        lzxpress_huffman.decompress(compressed, max_size=10)
+
+
+@pytest.mark.parametrize("data", [b"A", b"AB", b"hello", b"the quick brown fox"])
+def test_lzxpress_huffman_eof_symbol(data: bytes) -> None:
+    # Regression: the end-of-block symbol (256) must terminate decoding instead of
+    # being decoded as a match, which appended trailing garbage for short streams.
+    assert lzxpress_huffman.decompress(lzxpress_huffman.compress(data)) == data
+
+
+def test_lzxpress_huffman_long_match() -> None:
+    # Regression: a match longer than 0xFFFF bytes uses the v10.0 uint16(0)+uint32
+    # length escape, which the decoder previously did not read.
+    data = b"A" * 70000
+    assert lzxpress_huffman.decompress(lzxpress_huffman.compress(data)) == data
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzxpress_huffman_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lzxpress_huffman.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzxpress_huffman_compress(benchmark: BenchmarkFixture) -> None:
+    assert benchmark(lzxpress_huffman.compress, INPUT) == bytes.fromhex(COMPRESSED)
