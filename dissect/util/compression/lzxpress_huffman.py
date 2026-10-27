@@ -16,6 +16,10 @@ def _read_16_bit(fh: BinaryIO) -> int:
     return struct.unpack("<H", fh.read(2).rjust(2, b"\x00"))[0]
 
 
+def _read_32_bit(fh: BinaryIO) -> int:
+    return struct.unpack("<I", fh.read(4).rjust(4, b"\x00"))[0]
+
+
 class Node:
     __slots__ = ("children", "is_leaf", "symbol")
 
@@ -94,12 +98,22 @@ class BitString:
         return self.source.tell()
 
     def init(self, fh: BinaryIO) -> None:
-        self.mask = (_read_16_bit(fh) << 16) + _read_16_bit(fh)
-        self.bits = 32
+        self.mask = 0
+        self.bits = 0
         self.source = fh
+        self.refill()
 
     def read(self, n: int) -> bytes:
         return self.source.read(n)
+
+    def refill(self) -> None:
+        # MS-XCA: pull 16-bit LE words (MSB first) until at least 15 bits
+        # (the longest code length) are buffered. Refills only happen at
+        # symbol boundaries; refilling mid-code would consume raw length
+        # bytes that the encoder interleaves with the bit stream.
+        while self.bits < 15:
+            self.mask += _read_16_bit(self.source) << (16 - self.bits)
+            self.bits += 16
 
     def lookup(self, n: int) -> int:
         if n == 0:
@@ -110,9 +124,6 @@ class BitString:
     def skip(self, n: int) -> None:
         self.mask = (self.mask << n) & 0xFFFFFFFF
         self.bits -= n
-        if self.bits < 16:
-            self.mask += _read_16_bit(self.source) << (16 - self.bits)
-            self.bits += 16
 
     def decode(self, root: Node) -> Symbol:
         node = root
@@ -152,16 +163,18 @@ def decompress(src: bytes | BinaryIO) -> bytes:
 
         chunk_size = 0
         while chunk_size < 65536 and src.tell() - start_offset < size:
+            bitstring.refill()
             symbol = bitstring.decode(root)
             if symbol < 256:
                 dst.append(symbol)
                 chunk_size += 1
+            elif symbol == 256:
+                # End-of-data marker: the chunk (and stream) is done.
+                return bytes(dst)
             else:
                 symbol -= 256
                 length = symbol & 0x0F
                 symbol >>= 4
-
-                offset = (1 << symbol) + bitstring.lookup(symbol)
 
                 if length == 15:
                     length = ord(bitstring.read(1)) + 15
@@ -169,9 +182,20 @@ def decompress(src: bytes | BinaryIO) -> bytes:
                     if length == 270:
                         length = _read_16_bit(bitstring.source)
 
+                        if length == 0:
+                            length = _read_32_bit(bitstring.source)
+
+                if bitstring.bits < symbol:
+                    bitstring.refill()
+
+                offset = (1 << symbol) + bitstring.lookup(symbol)
                 bitstring.skip(symbol)
 
                 length += 3
+
+                # Matches never cross a 64KiB chunk boundary; MS-XCA
+                # decoders truncate the copy at the end of the chunk.
+                length = min(length, 65536 - chunk_size)
 
                 remaining = length
                 while remaining > 0:
