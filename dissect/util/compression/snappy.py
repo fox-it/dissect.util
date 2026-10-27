@@ -77,13 +77,11 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             offset = _I.unpack(src.read(4))[0]
 
         dst_offset = dst.tell() - offset
-        dst_view = dst.getbuffer()
-        try:
-            buf = dst_view[dst_offset : dst_offset + length].tobytes()
-        finally:
-            # Release the view before writing; BytesIO cannot be resized while a memoryview is active
-            # Reference: https://docs.python.org/3/library/stdtypes.html#memoryview.release
-            dst_view.release()
+        # Release the view and its slice before writing; BytesIO cannot be resized while a memoryview is active,
+        # and PyPy only drops the slice's export when its GC runs
+        # Reference: https://docs.python.org/3/library/stdtypes.html#memoryview.release
+        with dst.getbuffer() as dst_view, dst_view[dst_offset : dst_offset + length] as match:
+            buf = match.tobytes()
         if offset - length <= 0:
             buf = (buf * ((length // len(buf)) + 1))[:length]
 
