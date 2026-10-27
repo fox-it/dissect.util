@@ -38,11 +38,11 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     if not hasattr(src, "read"):
         src = io.BytesIO(src)
 
-    dst = io.BytesIO()
+    dst = bytearray()
 
     uncompressed_length = varint(src)
 
-    while dst.tell() < uncompressed_length:
+    while len(dst) < uncompressed_length:
         tag_byte = src.read(1)[0]
 
         if (tag := tag_byte & 0b11) == 0:
@@ -62,7 +62,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             if len(buf := src.read(length)) < length:
                 raise EOFError("Unexpected EOF while reading literal")
 
-            dst.write(buf)
+            dst += buf
             continue
 
         # Copy with 1, 2 or 4 byte offset
@@ -76,15 +76,11 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             length = (tag_byte >> 2) + 1
             offset = _I.unpack(src.read(4))[0]
 
-        dst_offset = dst.tell() - offset
-        # Release the view and its slice before writing; BytesIO cannot be resized while a memoryview is active,
-        # and PyPy only drops the slice's export when its GC runs
-        # Reference: https://docs.python.org/3/library/stdtypes.html#memoryview.release
-        with dst.getbuffer() as dst_view, dst_view[dst_offset : dst_offset + length] as match:
-            buf = match.tobytes()
+        dst_offset = len(dst) - offset
+        buf = dst[dst_offset : dst_offset + length]
         if offset - length <= 0:
             buf = (buf * ((length // len(buf)) + 1))[:length]
 
-        dst.write(buf)
+        dst += buf
 
-    return dst.getvalue()
+    return bytes(dst)
