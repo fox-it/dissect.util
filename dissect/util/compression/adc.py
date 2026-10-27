@@ -38,7 +38,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             distance = ((byte & 0x03) << 8) + extra[0] + 1
 
         if distance > len(dst):
-            raise ValueError("Invalid match distance in ADC stream")
+            raise ValueError("Invalid match distance")
 
         if count <= distance:
             dst += dst[-distance : (-distance + count) or None]
