@@ -45,6 +45,24 @@ def test_crc32c_benchmark(crc32c: ModuleType, benchmark: BenchmarkFixture) -> No
     benchmark(crc32c.crc32c, b"hello, world!", 0)
 
 
+@pytest.mark.parametrize(
+    ("data", "value", "expected"),
+    [
+        (b"123456789", 0, 0xAE8B14860A799888),
+        (b"", 0, 0),
+        (b"\x00" * 32, 0, 0xCF3473434D4ECF3B),
+        (b"hello, world!", 0x123456789ABCDEF0, 0x96270A5EF700596F),
+    ],
+)
+def test_crc64c(crc64c: ModuleType, data: bytes, value: int, expected: int) -> None:
+    assert crc64c.crc64c(data, value) == expected
+
+
+@pytest.mark.benchmark
+def test_crc64c_benchmark(crc64c: ModuleType, benchmark: BenchmarkFixture) -> None:
+    benchmark(crc64c.crc64c, b"hello, world!", 0)
+
+
 def test_lookup8_remainder() -> None:
     ip = b"192.168.1.109"
     volume = b"/home/roel/nfstest"
