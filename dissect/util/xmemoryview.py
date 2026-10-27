@@ -113,5 +113,22 @@ class _xmemoryview:
         for value in self._view:
             yield self._convert_from_native(value)
 
+    def __bytes__(self) -> bytes:
+        # Without this, bytes() would iterate over the converted values instead of using the underlying bytes
+        return self._view.tobytes()
+
+    def __buffer__(self, flags: int) -> memoryview:
+        """Expose the underlying bytes through the buffer protocol.
+
+        This allows the object to be used wherever a bytes-like object is accepted, such as ``bytes()``,
+        ``io.BytesIO`` or ``struct.unpack_from()``. The buffer is exposed as unsigned bytes, since consumers that
+        interpret the elements of the buffer would otherwise see values in host endianness.
+
+        (Python 3.12+, see PEP 688).
+        """
+        if self._view.c_contiguous:
+            return self._view.cast("B")
+        return memoryview(self._view)
+
     def __getattr__(self, attr: str) -> Any:
         return getattr(self._view, attr)
