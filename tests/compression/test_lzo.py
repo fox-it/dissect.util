@@ -204,6 +204,14 @@ def test_lzo_decompress(lzo: ModuleType, data: str, header: bool, buflen: int, d
     assert hashlib.sha256(lzo.decompress(bytes.fromhex(data), header, buflen)).hexdigest() == digest
 
 
+@pytest.mark.parametrize("source_type", [bytes, bytearray, memoryview])
+@pytest.mark.parametrize(*PARAMS)
+def test_lzo_decompress_source_types(
+    lzo: ModuleType, data: str, header: bool, buflen: int, digest: str, source_type: type
+) -> None:
+    assert hashlib.sha256(lzo.decompress(source_type(bytes.fromhex(data)), header, buflen)).hexdigest() == digest
+
+
 def test_lzo_decompress_invalid_distance() -> None:
     # A literal followed by a match that refers back to before the start of the output.
     # Only the pure Python implementation, as lzokay-native panics on this input instead of raising an error.

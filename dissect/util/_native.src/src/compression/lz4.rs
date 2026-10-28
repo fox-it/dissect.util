@@ -3,6 +3,8 @@ use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::{PyByteArray, PyBytes};
 
+use crate::buffer::Buffer;
+
 const MAX_DISCOVER_OUTPUT_SIZE: usize = 1024 * 1024 * 1024;
 
 fn decompress_block(
@@ -64,7 +66,7 @@ fn decompress_to_unknown_size(src: &[u8], dictionary: &[u8]) -> Result<Vec<u8>, 
 #[pyo3(signature = (src, uncompressed_size=-1, return_bytearray=false, dictionary=None))]
 fn decompress(
     py: Python<'_>,
-    src: Vec<u8>,
+    src: Buffer,
     uncompressed_size: isize,
     return_bytearray: bool,
     dictionary: Option<PyBackedBytes>,

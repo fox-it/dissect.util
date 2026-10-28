@@ -1,5 +1,7 @@
 use pyo3::prelude::*;
 
+use crate::buffer::Buffer;
+
 const _TABLE: [u64; 256] = [
     0x0000000000000000,
     0x7f6ef0c830358979,
@@ -270,9 +272,9 @@ const _TABLE: [u64; 256] = [
 ///
 #[pyfunction]
 #[pyo3(signature = (crc, data))]
-fn update(py: Python<'_>, crc: u64, data: Vec<u8>) -> PyResult<Py<PyAny>> {
+fn update(py: Python<'_>, crc: u64, data: Buffer) -> PyResult<Py<PyAny>> {
     let mut crc = crc ^ 0xFFFFFFFFFFFFFFFF;
-    for &b in &data {
+    for &b in data.iter() {
         crc = _TABLE[((crc ^ b as u64) & 0xFF) as usize] ^ (crc >> 8);
     }
     Ok((crc ^ 0xFFFFFFFFFFFFFFFF).into_pyobject(py)?.into())
@@ -289,7 +291,7 @@ fn update(py: Python<'_>, crc: u64, data: Vec<u8>) -> PyResult<Py<PyAny>> {
 ///
 #[pyfunction]
 #[pyo3(signature = (data, value=0))]
-fn crc64c(py: Python<'_>, data: Vec<u8>, value: u64) -> PyResult<Py<PyAny>> {
+fn crc64c(py: Python<'_>, data: Buffer, value: u64) -> PyResult<Py<PyAny>> {
     update(py, value, data)
 }
 

@@ -40,9 +40,21 @@ def test_crc32c(crc32c: ModuleType, data: bytes, value: int, expected: int) -> N
     assert crc32c.crc32c(data, value) == expected
 
 
+@pytest.mark.parametrize("source_type", [bytes, bytearray, memoryview])
+def test_crc32c_source_types(crc32c: ModuleType, source_type: type) -> None:
+    assert crc32c.crc32c(source_type(bytes(range(32))), 0) == 0x46DD794E
+    assert crc32c.update(0x12345678, source_type(b"hello, world!")) == 0x30663976
+
+
 @pytest.mark.benchmark
 def test_crc32c_benchmark(crc32c: ModuleType, benchmark: BenchmarkFixture) -> None:
     benchmark(crc32c.crc32c, b"hello, world!", 0)
+
+
+@pytest.mark.benchmark
+def test_crc32c_benchmark_page(crc32c: ModuleType, benchmark: BenchmarkFixture) -> None:
+    # A 4 KiB page, as in the TIBX archives of dissect.archive
+    assert benchmark(crc32c.crc32c, bytes(range(256)) * 16, 0) == 0x9C71FE32
 
 
 @pytest.mark.parametrize(
@@ -56,6 +68,12 @@ def test_crc32c_benchmark(crc32c: ModuleType, benchmark: BenchmarkFixture) -> No
 )
 def test_crc64c(crc64c: ModuleType, data: bytes, value: int, expected: int) -> None:
     assert crc64c.crc64c(data, value) == expected
+
+
+@pytest.mark.parametrize("source_type", [bytes, bytearray, memoryview])
+def test_crc64c_source_types(crc64c: ModuleType, source_type: type) -> None:
+    assert crc64c.crc64c(source_type(b"123456789"), 0) == 0xAE8B14860A799888
+    assert crc64c.update(0x123456789ABCDEF0, source_type(b"hello, world!")) == 0x96270A5EF700596F
 
 
 @pytest.mark.benchmark

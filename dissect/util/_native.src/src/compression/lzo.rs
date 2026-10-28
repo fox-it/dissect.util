@@ -2,6 +2,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
+use crate::buffer::Buffer;
+
 /// LZO decompress from bytes. Assumes no header.
 ///
 /// Arguments are largely compatible with python-lzo API.
@@ -20,7 +22,7 @@ use pyo3::types::PyBytes;
 #[pyo3(signature = (src, header=true, buflen=-1))]
 fn decompress(
     py: Python<'_>,
-    src: Vec<u8>,
+    src: Buffer,
     header: bool,
     buflen: isize,
 ) -> PyResult<Bound<'_, PyBytes>> {
@@ -31,13 +33,12 @@ fn decompress(
             return Err(PyValueError::new_err("Invalid header value"));
         }
         let len = u32::from_le_bytes([src[1], src[2], src[3], src[4]]) as usize;
-        (src[5..].to_vec(), Some(len))
+        (&src[5..], Some(len))
     } else {
-        (src, (buflen >= 0).then_some(buflen as usize))
+        (&src[..], (buflen >= 0).then_some(buflen as usize))
     };
 
-    let mut cursor = std::io::Cursor::new(body);
-    lzokay_native::decompress(&mut cursor, out_len)
+    lzokay_native::decompress_all(body, out_len)
         .map_err(|e| PyErr::new::<PyValueError, _>(e.to_string()))
         .map(|result| PyBytes::new(py, &result))
 }

@@ -128,6 +128,12 @@ def test_lz4_decompress_chain(lz4: ModuleType) -> None:
     )
 
 
+@pytest.mark.parametrize("source_type", [bytes, bytearray, memoryview])
+def test_lz4_decompress_source_types(lz4: ModuleType, source_type: type) -> None:
+    data, digest = PARAMS[1][1].values
+    assert hashlib.sha256(lz4.decompress(source_type(bytes.fromhex(data)))).hexdigest() == digest
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lz4_decompress(lz4: ModuleType, data: str, digest: str, benchmark: BenchmarkFixture) -> None:
