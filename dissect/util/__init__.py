@@ -8,10 +8,11 @@ from dissect.util.compression import (
     lzxpress_huffman,
     sevenbit,
 )
-from dissect.util.hash import crc32c, crc64c, jenkins
+from dissect.util.hash import crc32c, crc64_redis, crc64c, jenkins
 
 __all__ = [
     "crc32c",
+    "crc64_redis",
     "crc64c",
     "jenkins",
     "lz4",

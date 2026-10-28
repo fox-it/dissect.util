@@ -66,3 +66,17 @@ def crc64c(request: pytest.FixtureRequest) -> ModuleType:
     from dissect.util import hash
 
     return _native_or_python(hash, "crc64c", request)
+
+
+@pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
+def crc64_redis(request: pytest.FixtureRequest) -> ModuleType:
+    from dissect.util import hash
+
+    return _native_or_python(hash, "crc64_redis", request)
+
+
+@pytest.fixture(scope="session", params=[True, False], ids=["native", "python"])
+def crc(request: pytest.FixtureRequest) -> ModuleType:
+    from dissect.util import hash
+
+    return _native_or_python(hash, "crc", request)
