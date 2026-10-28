@@ -70,6 +70,12 @@ def test_crc64c(crc64c: ModuleType, data: bytes, value: int, expected: int) -> N
     assert crc64c.crc64c(data, value) == expected
 
 
+@pytest.mark.parametrize("source_type", [bytes, bytearray, memoryview])
+def test_crc64c_source_types(crc64c: ModuleType, source_type: type) -> None:
+    assert crc64c.crc64c(source_type(b"123456789"), 0) == 0xAE8B14860A799888
+    assert crc64c.update(0x123456789ABCDEF0, source_type(b"hello, world!")) == 0x96270A5EF700596F
+
+
 @pytest.mark.benchmark
 def test_crc64c_benchmark(crc64c: ModuleType, benchmark: BenchmarkFixture) -> None:
     benchmark(crc64c.crc64c, b"hello, world!", 0)
