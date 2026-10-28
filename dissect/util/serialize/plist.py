@@ -12,20 +12,35 @@ if TYPE_CHECKING:
 
 
 class NSKeyedArchiver:
+    """A NSKeyedArchiver wrapper around Python's ``plistlib``.
+
+    References:
+        - https://developer.apple.com/documentation/foundation/nskeyedarchiver
+        - https://github.com/opensource-apple/CF/blob/master/CFBinaryPList.c
+        - https://docs.python.org/3/library/plistlib.html
+    """
+
     def __init__(self, fh: BinaryIO):
-        self.plist = plistlib.load(fh)
+        try:
+            self.plist = plistlib.load(fh)
+        except plistlib.InvalidFileException as e:
+            raise ValueError("Unable to parse file as NSKeyedArchiver plist") from e
 
-        if not isinstance(self.plist, dict) or not all(
-            key in self.plist for key in ["$version", "$archiver", "$top", "$objects"]
-        ):
-            raise ValueError("File is not an NSKeyedArchiver plist")
-
-        self._objects = self.plist.get("$objects")
-        self._cache = {}
+        if not isinstance(self.plist, dict):
+            raise ValueError("File is not an NSKeyedArchiver plist")  # noqa: TRY004
 
         self.top = {}
-        for name, value in self.plist.get("$top", {}).items():
-            self.top[name] = self._parse(value)
+
+        if all(key in self.plist for key in ["$version", "$archiver", "$top", "$objects"]):
+            self._objects = self.plist.get("$objects")
+            self._cache = {}
+
+            for name, value in self.plist.get("$top", {}).items():
+                self.top[name] = self._parse(value)
+
+        else:
+            for name, value in self.plist.items():
+                self.top[name] = self._parse(value)
 
     def __getitem__(self, key: str) -> Any:
         return self.top[key]

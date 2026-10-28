@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import datetime
-import sys
 import uuid
 from plistlib import UID
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-import pytest
+from dissect.util.serialize.plist import NSKeyedArchiver
+from tests._utils import absolute_path
 
-from dissect.util.plist import NSKeyedArchiver
 
-
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="requires python3.8 or higher")
 def test_plist_nskeyedarchiver() -> None:
     data = {
         "$version": 100000,
@@ -132,7 +129,7 @@ def test_plist_nskeyedarchiver() -> None:
         ],
     }
     with patch("plistlib.load", return_value=data):
-        obj = NSKeyedArchiver(None)
+        obj = NSKeyedArchiver(MagicMock())
         assert "root" in obj.top
 
         root = obj["root"]
@@ -148,3 +145,15 @@ def test_plist_nskeyedarchiver() -> None:
         assert root.URLBaseless == "relative"
         assert root.Array == root.Set == [1, "TestString"]
         assert list(root.Dict.items()) == [("DictKey", "TestString")]
+
+
+def test_plist_binary_simple() -> None:
+    """Test if we can parse simple binary NSKeyedArchiver plist files.
+
+    Reference:
+        - https://corp.digitalcorpora.org/corpora/iOS17/
+    """
+    with absolute_path("_data/serialize/com.apple.batterydata.discharging.plist").open("rb") as fh:
+        obj = NSKeyedArchiver(fh)
+        assert obj.get("Serial") == "F8Y93533LR1M6YN7A"
+        assert obj.get("Format Version") == 4
