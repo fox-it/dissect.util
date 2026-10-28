@@ -674,12 +674,18 @@ class ZlibStream(AlignedStream):
 class BitStream:
     """Bit-level stream reader.
 
+    Bits are read MSB first from words of ``word_size`` bytes.
+
     Args:
         fh: File-like object to read bits from.
+        word_size: The size of a word in bytes.
+        byteorder: The byte order of a word, either ``"big"`` or ``"little"``.
     """
 
-    def __init__(self, fh: BinaryIO):
+    def __init__(self, fh: BinaryIO, word_size: int = 1, byteorder: str = "big"):
         self.fh = fh
+        self.word_size = word_size
+        self.byteorder = byteorder
         self._byte_offset = fh.tell()
 
         self.buffer = 0
@@ -703,19 +709,21 @@ class BitStream:
         Returns:
             The new stream position after seeking.
         """
+        word_bits = self.word_size * 8
+
         if whence == io.SEEK_SET:
-            byte_pos, bit_pos = divmod(pos, 8)
+            word_pos, bit_pos = divmod(pos, word_bits)
         elif whence == io.SEEK_CUR:
             current_pos = self.tell()
-            byte_pos, bit_pos = divmod(current_pos + pos, 8)
+            word_pos, bit_pos = divmod(current_pos + pos, word_bits)
         elif whence == io.SEEK_END:
             self.fh.seek(0, io.SEEK_END)
             end_pos = self.fh.tell() * 8
-            byte_pos, bit_pos = divmod(end_pos + pos, 8)
+            word_pos, bit_pos = divmod(end_pos + pos, word_bits)
         else:
             raise IOError("invalid whence value")
 
-        self._byte_offset = byte_pos
+        self._byte_offset = word_pos * self.word_size
         self.bits = 0
         self.buffer = 0
 
@@ -738,6 +746,49 @@ class BitStream:
         self.remove(n)
         return value
 
+    def read_bytes(self, n: int) -> bytes:
+        """Read n bytes from the underlying stream, directly following the buffered bits.
+
+        The buffered bits are not affected, which allows reading formats that interleave bytes with the bit stream.
+
+        Args:
+            n: Number of bytes to read.
+        """
+        self.fh.seek(self._byte_offset)
+        buf = self.fh.read(n)
+        self._byte_offset += len(buf)
+        return buf
+
+    def ensure(self, n: int) -> None:
+        """Ensure at least n bits are buffered, reading whole words from the underlying stream.
+
+        Args:
+            n: Number of bits to buffer.
+        """
+        word_bits = self.word_size * 8
+
+        while self.bits < n:
+            num_words = (n - self.bits + word_bits - 1) // word_bits
+            self.fh.seek(self._byte_offset)
+            if not (buf := self.fh.read(num_words * self.word_size)):
+                break
+
+            if len(buf) % self.word_size:
+                # Pad a partial word at the end of the stream with zero bytes
+                buf = buf.ljust(len(buf) + self.word_size - len(buf) % self.word_size, b"\x00")
+
+            if self.byteorder == "big" or self.word_size == 1:
+                new_bits = int.from_bytes(buf, "big")
+            else:
+                new_bits = 0
+                for i in range(0, len(buf), self.word_size):
+                    new_bits = (new_bits << word_bits) | int.from_bytes(buf[i : i + self.word_size], self.byteorder)
+
+            num_new_bits = len(buf) * 8
+            self.buffer = (self.buffer << num_new_bits) | new_bits
+            self.bits += num_new_bits
+            self._byte_offset += len(buf)
+
     def peek(self, n: int) -> int:
         """Peek n bits from the stream without advancing.
 
@@ -747,20 +798,13 @@ class BitStream:
         if n == 0:
             return 0
 
+        self.ensure(n)
+
         if n > self.bits:
-            while self.bits < n:
-                num_bytes = (n - self.bits + 7) // 8
-                self.fh.seek(self._byte_offset)
-                if not (buf := self.fh.read(num_bytes)):
-                    break
+            # Pad with zero bits when peeking past the end of the stream
+            return self.buffer << (n - self.bits)
 
-                new_bits = int.from_bytes(buf, "big")
-                num_new_bits = len(buf) * 8
-                self.buffer = (self.buffer << num_new_bits) | new_bits
-                self.bits += num_new_bits
-                self._byte_offset += len(buf)
-
-        return self.buffer >> (self.bits - min(n, self.bits))
+        return self.buffer >> (self.bits - n)
 
     def remove(self, n: int) -> None:
         """Remove n bits from the stream.
