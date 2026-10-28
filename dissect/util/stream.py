@@ -521,6 +521,15 @@ class OverlayStream(AlignedStream):
         overlays = self.overlays
         lookup = self._lookup
 
+        if length < 0:
+            # Only happens when reading to EOF on a stream with no size, so determine the end
+            # from the source file-like object and any overlays that reach past it
+            fh.seek(0, io.SEEK_END)
+            end = fh.tell()
+            for overlay_offset in lookup:
+                end = max(end, overlay_offset + overlays[overlay_offset][0])
+            length = max(0, end - offset)
+
         overlay_len = len(overlays)
         overlay_idx = bisect_left(lookup, offset)
 
