@@ -33,7 +33,9 @@ except (ImportError, AttributeError):
     crc64c_native = None
     crc64_redis_native = None
 
-# Generic CRC classes, e.g. Crc64(0xAD93D23594C935A9, init=0, xorout=0, reflected=True)
+# Generic CRC classes, e.g.:
+#   Crc32(0x04C11DB7, init=0xFFFFFFFF, xorout=0xFFFFFFFF, reflected=True)  # zlib
+#   Crc64(0xAD93D23594C935A9, init=0, xorout=0, reflected=True)  # redis
 Crc32 = crc.Crc32
 Crc64 = crc.Crc64
 
