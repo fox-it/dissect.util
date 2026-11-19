@@ -1,3 +1,11 @@
+"""LZOP decompression.
+
+LZOP is a gzip-like file compressor that wraps LZO1X-compressed blocks in a simple container format. 
+
+References:
+    - https://www.lzop.org/
+    - https://www.oberhumer.com/opensource/lzo/
+"""
 from __future__ import annotations
 
 import io
