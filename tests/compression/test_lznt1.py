@@ -137,7 +137,46 @@ def test_lznt1_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lznt1.decompress(bytes.fromhex(data)).rstrip(b"\x00")).hexdigest() == digest
 
 
+# LZNT1 of a 4096 byte A-Z pattern, from ntdll RtlCompressBuffer (COMPRESSION_FORMAT_LZNT1) on Windows 11 build 26100
+GOLD = (
+    "0fb1004243444546474849004a4b4c4d4e4f5051005253545556575859fc5a41ffcf5f80ff819f839f833f85ffdf86df867f881f8abf8bbf"
+    "8b5f8dff8eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0e"
+    "ff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e"
+    "9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f"
+    "0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0e0f9f0e9f0e9f0e910e"
+)
+GOLD_DIGEST = "45508be868dafa697653cbc4cc934b0ce5266eb7e87a5a9ac8fc8005ecc03189"
+
+INPUT = b"the quick brown fox jumps over the lazy dog. " * 8
+COMPRESSED = (
+    "33b0007468652071756963006b2062726f776e2000666f78206a756d708073206f7665722001f0006c617a7920646f67062e023434b1"
+)
+
+
+def test_lznt1_decompress_gold() -> None:
+    assert hashlib.sha256(lznt1.decompress(bytes.fromhex(GOLD))).hexdigest() == GOLD_DIGEST
+
+
+def test_lznt1_compress() -> None:
+    assert lznt1.compress(INPUT) == bytes.fromhex(COMPRESSED)
+    assert lznt1.decompress(lznt1.compress(INPUT)) == INPUT
+
+
+@pytest.mark.parametrize(
+    "data",
+    [b"", b"a", bytes(4096), bytes(range(256)) * 40, b"the quick brown fox" * 1000],
+    ids=["empty", "single", "zero-chunk", "incompressible-chunks", "multi-chunk"],
+)
+def test_lznt1_compress_roundtrip(data: bytes) -> None:
+    assert lznt1.decompress(lznt1.compress(data)) == data
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lznt1_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lznt1.decompress, bytes.fromhex(data)).rstrip(b"\x00")).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lznt1_compress(benchmark: BenchmarkFixture) -> None:
+    assert benchmark(lznt1.compress, INPUT) == bytes.fromhex(COMPRESSED)

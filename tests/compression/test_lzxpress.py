@@ -53,7 +53,33 @@ def test_lzxpress_decompress_invalid_distance() -> None:
         lzxpress.decompress(bytes.fromhex("000000800000"))
 
 
+INPUT = b"the quick brown fox jumps over the lazy dog. " * 8
+COMPRESSED = (
+    "0100000074686520717569636b2062726f776e20666f78206a756d7073206f76657220f100ffff7f006c617a7920646f672e6a00"
+    "67010fff3401"
+)
+
+
+def test_lzxpress_compress() -> None:
+    assert lzxpress.compress(INPUT) == bytes.fromhex(COMPRESSED)
+    assert lzxpress.decompress(lzxpress.compress(INPUT)) == INPUT
+
+
+@pytest.mark.parametrize(
+    "data",
+    [b"", b"a", b"aaaa", b"a" * 300, b"a" * 70000, bytes(range(256)) * 64],
+    ids=["empty", "single", "short-match", "byte-length", "dword-length", "far-offsets"],
+)
+def test_lzxpress_compress_roundtrip(data: bytes) -> None:
+    assert lzxpress.decompress(lzxpress.compress(data)) == data
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzxpress_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lzxpress.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzxpress_compress(benchmark: BenchmarkFixture) -> None:
+    assert benchmark(lzxpress.compress, INPUT) == bytes.fromhex(COMPRESSED)

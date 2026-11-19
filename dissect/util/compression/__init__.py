@@ -21,7 +21,8 @@ lzo_python = lzo
 # dissect.util.compression.lzo_python.
 #
 # Note that the pure Python implementation and the Rust implementation are NOT a full replacement
-# for the "official" lz4 and lzo Python packages: only the decompress() function is implemented.
+# for the "official" lz4 and lzo Python packages: only the decompress() function is implemented, plus
+# compress() in the pure Python lz4. Use dissect.util.compression.lz4_python to compress.
 try:
     from dissect.util import _native
 
