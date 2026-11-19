@@ -60,6 +60,14 @@ COMPRESSED = (
 )
 
 
+def test_lzxpress_decompress_size() -> None:
+    compressed = lzxpress.compress(INPUT)
+    assert lzxpress.decompress(compressed, len(INPUT)) == INPUT
+    # Stops at the given size, also halfway through a match
+    assert lzxpress.decompress(compressed, 10) == INPUT[:10]
+    assert lzxpress.decompress(compressed, 100) == INPUT[:100]
+
+
 def test_lzxpress_compress() -> None:
     assert lzxpress.compress(INPUT) == bytes.fromhex(COMPRESSED)
     assert lzxpress.decompress(lzxpress.compress(INPUT)) == INPUT

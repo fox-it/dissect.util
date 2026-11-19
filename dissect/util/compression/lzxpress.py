@@ -6,11 +6,14 @@ import struct
 from typing import BinaryIO
 
 
-def decompress(src: bytes | BinaryIO) -> bytes:
+def decompress(src: bytes | BinaryIO, size: int | None = None) -> bytes:
     """LZXPRESS decompress from a file-like object or bytes.
+
+    Decompresses until the end of the input or, if it's given, until the decompressed size is reached.
 
     Args:
         src: File-like object or bytes to decompress.
+        size: The decompressed size, if known.
 
     Returns:
         The decompressed data.
@@ -20,7 +23,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
 
     offset = src.tell()
     src.seek(0, io.SEEK_END)
-    size = src.tell() - offset
+    src_size = src.tell() - offset
     src.seek(offset)
 
     dst = bytearray()
@@ -29,7 +32,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     buffered_flags_count = 0
     last_length_half_byte = 0
 
-    while src.tell() - offset < size:
+    while src.tell() - offset < src_size and (size is None or len(dst) < size):
         if buffered_flags_count == 0:
             buffered_flags = struct.unpack("<I", src.read(4))[0]
             buffered_flags_count = 32
@@ -38,7 +41,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
         if buffered_flags & (1 << buffered_flags_count) == 0:
             dst.append(ord(src.read(1)))
         else:
-            if src.tell() - offset == size:
+            if src.tell() - offset == src_size:
                 break
 
             match = struct.unpack("<H", src.read(2))[0]
@@ -82,7 +85,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
                 dst += chunk * (match_length // match_offset)
                 dst += chunk[: match_length % match_offset]
 
-    return bytes(dst)
+    return bytes(dst[:size])
 
 
 # Compression ([MS-XCA] 2.3.4)
