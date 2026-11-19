@@ -46,6 +46,7 @@ __all__ = [
     "lzrc",
     "lzvn",
     "lzxpress",
+    "lzxpress9",
     "lzxpress_huffman",
     "sevenbit",
     "snappy",
