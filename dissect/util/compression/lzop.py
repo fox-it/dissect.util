@@ -1,6 +1,6 @@
 """LZOP decompression.
 
-LZOP is a gzip-like file compressor that wraps LZO1X-compressed blocks in a simple container format. 
+LZOP is a gzip-like file compressor that wraps LZO1X-compressed blocks in a simple container format.
 
 References:
     - https://www.lzop.org/
