@@ -6,6 +6,7 @@ References:
     - https://www.lzop.org/
     - https://www.oberhumer.com/opensource/lzo/
 """
+
 from __future__ import annotations
 
 import io
