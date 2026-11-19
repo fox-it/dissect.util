@@ -47,6 +47,12 @@ def test_lzxpress_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lzxpress.decompress(bytes.fromhex(data))).hexdigest() == digest
 
 
+def test_lzxpress_decompress_invalid_distance() -> None:
+    # The first flag bit marks a match, which has nothing to refer back to yet
+    with pytest.raises(ValueError, match="Invalid match distance"):
+        lzxpress.decompress(bytes.fromhex("000000800000"))
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzxpress_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:

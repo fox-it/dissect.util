@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from dissect.util.xmemoryview import xmemoryview
+import io
+import struct
+import sys
+
+import pytest
+
+from dissect.util.xmemoryview import _xmemoryview, xmemoryview
+
+# The non-native endianness, which results in an _xmemoryview instead of a regular memoryview
+NON_NATIVE = ">" if sys.byteorder == "little" else "<"
 
 
 def test_xmemoryview_little() -> None:
@@ -47,3 +56,33 @@ def test_xmemoryview_big() -> None:
 
     it = iter(xview)
     assert list(it)[:5] == [0x00010203, 0x04050607, 0x08090A0B, 0x0C0D0E0F, 0x10111213]
+
+
+def test_xmemoryview_bytes() -> None:
+    buf = bytearray(range(16))
+    xview = xmemoryview(buf, f"{NON_NATIVE}I")
+    assert isinstance(xview, _xmemoryview)
+
+    assert bytes(xview) == bytes(buf)
+    assert bytes(xview[1:3]) == bytes(buf[4:12])
+    assert bytes(xview[::2]) == bytes(buf[0:4] + buf[8:12])
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="the buffer protocol for Python classes requires Python 3.12+")
+def test_xmemoryview_buffer() -> None:
+    buf = bytearray(range(16))
+    xview = xmemoryview(buf, f"{NON_NATIVE}I")
+    assert isinstance(xview, _xmemoryview)
+
+    view = memoryview(xview)
+    assert view.format == "B"
+    assert view.nbytes == len(buf)
+    assert view.tobytes() == bytes(buf)
+
+    assert io.BytesIO(xview).read() == bytes(buf)
+    assert struct.unpack_from(f"{NON_NATIVE}I", xview) == (xview[0],)
+    assert bytes(xview[::2]) == bytes(buf[0:4] + buf[8:12])
+
+    # Writes through the buffer are reflected in the underlying buffer
+    view[0] = 0xFF
+    assert buf[0] == 0xFF

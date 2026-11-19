@@ -171,3 +171,9 @@ def test_negative_timestamps(imported_ts: ModuleType) -> None:
         1969, 12, 17, 22, 59, 47, 786787, tzinfo=timezone.utc
     )
     assert imported_ts.from_unix(-0xDEADBEEF) == datetime(1851, 8, 13, 2, 4, 1, tzinfo=timezone.utc)
+
+
+def test_golang_timestamp(ts: ModuleType) -> None:
+    """Test if we can convert golang ``Time.time`` marshalled bytes to a datetime object."""
+    timestamp = bytes.fromhex("010000000ee2221c201f08a2f6ffff")
+    assert ts.golangtimestamp(timestamp) == datetime(2026, 8, 27, 11, 53, 4, 520659, tzinfo=timezone.utc)

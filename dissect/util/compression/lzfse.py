@@ -386,11 +386,13 @@ def _decode_lmd(
 
         dst += lit.read(L)
 
-        remaining = M
-        while remaining > 0:
-            match_size = min(remaining, D)
-            dst += dst[-D : (-D + match_size) or None]
-            remaining -= match_size
+        if M <= D:
+            dst += dst[-D : (-D + M) or None]
+        else:
+            # The match overlaps the output it produces, so it repeats the last D bytes
+            chunk = dst[-D:]
+            dst += chunk * (M // D)
+            dst += chunk[: M % D]
 
         symbols -= 1
 

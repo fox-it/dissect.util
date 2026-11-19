@@ -31,6 +31,8 @@ except (ImportError, AttributeError):
     lz4_native = lzo_native = None
 
 __all__ = [
+    "adc",
+    "huffman",
     "lz4",
     "lz4_native",
     "lz4_python",
@@ -40,8 +42,11 @@ __all__ = [
     "lzo",
     "lzo_native",
     "lzo_python",
+    "lzrc",
     "lzvn",
     "lzxpress",
     "lzxpress_huffman",
     "sevenbit",
+    "snappy",
+    "xz",
 ]

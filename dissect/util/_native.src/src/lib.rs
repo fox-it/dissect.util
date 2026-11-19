@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 
+mod buffer;
 mod compression;
 mod hash;
 

@@ -292,6 +292,10 @@ def test_bitstream() -> None:
     assert bitstream.seek(-8, io.SEEK_END) == 56
     assert bitstream.peek(8) == 0b01010101
 
+    fh = io.BytesIO(b"\x00\xe0")
+    bitstream = stream.BitStream(fh)
+    assert bitstream.read(16) == 0x00E0
+
 
 def test_bitstream_empty() -> None:
     """Test reading from an empty bit stream."""
@@ -300,6 +304,55 @@ def test_bitstream_empty() -> None:
 
     assert bitstream.peek(8) == 0
     assert bitstream.read(8) == 0
+
+
+def test_bitstream_eof() -> None:
+    """Test reading past the end of a bit stream."""
+    fh = io.BytesIO(b"\xab")
+    bitstream = stream.BitStream(fh)
+
+    assert bitstream.read(4) == 0xA
+    assert bitstream.peek(8) == 0xB0
+    assert bitstream.read(8) == 0xB0
+    assert bitstream.tell() == 8
+
+
+@pytest.mark.parametrize(
+    ("byteorder", "expected", "expected_partial"),
+    [
+        ("big", 0b10101010_11001100_11110000_00001111, 0b11111111_00000000),
+        ("little", 0b11001100_10101010_00001111_11110000, 0b00000000_11111111),
+    ],
+)
+def test_bitstream_word_size(byteorder: str, expected: int, expected_partial: int) -> None:
+    """Test reading bits from 16-bit words."""
+    fh = io.BytesIO(bytes([0b10101010, 0b11001100, 0b11110000, 0b00001111, 0b11111111]))
+    bitstream = stream.BitStream(fh, word_size=2, byteorder=byteorder)
+
+    assert bitstream.peek(32) == expected
+    assert bitstream.read(4) == expected >> 28
+    assert bitstream.tell() == 4
+
+    # Words are always read whole
+    assert bitstream.seek(20) == 20
+    assert bitstream.bits == 12
+    assert bitstream.read(12) == expected & 0xFFF
+
+    # A partial word at the end of the stream is padded with zero bytes
+    assert bitstream.read(16) == expected_partial
+    assert bitstream.tell() == 48
+
+
+def test_bitstream_read_bytes() -> None:
+    """Test reading bytes interleaved with the bit stream."""
+    fh = io.BytesIO(b"\x12\x34\x56\x78\x9a\xbc")
+    bitstream = stream.BitStream(fh, word_size=2, byteorder="little")
+
+    assert bitstream.read(4) == 0x3
+    assert bitstream.read_bytes(1) == b"\x56"
+    assert bitstream.read(12) == 0x412
+    assert bitstream.read(16) == 0x9A78
+    assert bitstream.read_bytes(2) == b"\xbc"
 
 
 class NullStream(stream.AlignedStream):
