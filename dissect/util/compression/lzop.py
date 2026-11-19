@@ -13,6 +13,7 @@ from typing import BinaryIO
 
 from dissect.util.compression import lzo
 
+LZOP_MAGIC = b"\x89LZO\x00\x0d\x0a\x1a\x0a"
 HEADER_HAS_FILTER = 0x00000800
 
 
@@ -28,7 +29,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
     if not hasattr(src, "read"):
         src = io.BytesIO(src)
 
-    if src.read(9) != b"\x89LZO\x00\x0d\x0a\x1a\x0a":
+    if src.read(9) != LZOP_MAGIC:
         raise ValueError("Invalid LZOP header")
 
     version = int.from_bytes(src.read(2), "big")
