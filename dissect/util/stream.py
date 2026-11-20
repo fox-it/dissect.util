@@ -121,15 +121,18 @@ class AlignedStream(io.RawIOBase):
         with self._lock:
             if size is None and n == -1:
                 r = []
+                start = self._pos
+
                 if self._buf:
                     buffer_pos = self._pos - self._pos_align
                     r.append(self._buf[buffer_pos:])
                     self._set_pos(self._pos_align + align)
 
-                r.append(self._read(self._pos_align, -1))
+                # We read from the aligned position, so drop everything before the current position
+                r.append(self._read(self._pos_align, -1)[self._pos - self._pos_align :])
 
                 buf = b"".join(r)
-                self._set_pos(self._pos + len(buf))
+                self._set_pos(start + len(buf))
                 return buf
 
             # If we know the stream size, adjust n
