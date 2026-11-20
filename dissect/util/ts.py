@@ -4,23 +4,23 @@ import math
 import struct
 from datetime import datetime, timedelta, timezone
 
-_UTC = timezone.utc
+UTC = timezone.utc
 
-_EPOCH_UNIX = datetime(1970, 1, 1, tzinfo=_UTC)
-_EPOCH_WINDOWS = datetime(1601, 1, 1, tzinfo=_UTC)
-_EPOCH_UUID1 = datetime(1582, 10, 15, tzinfo=_UTC)
-_EPOCH_OA = datetime(1899, 12, 30, tzinfo=_UTC)
-_EPOCH_COCOA = datetime(2001, 1, 1, tzinfo=_UTC)
-_EPOCH_GO = datetime(1, 1, 1, tzinfo=_UTC)
+EPOCH_UNIX = datetime(1970, 1, 1, tzinfo=UTC)
+EPOCH_WINDOWS = datetime(1601, 1, 1, tzinfo=UTC)
+EPOCH_UUID1 = datetime(1582, 10, 15, tzinfo=UTC)
+EPOCH_OA = datetime(1899, 12, 30, tzinfo=UTC)
+EPOCH_COCOA = datetime(2001, 1, 1, tzinfo=UTC)
+EPOCH_GO = datetime(1, 1, 1, tzinfo=UTC)
 
 # Timestamps are calculated relatively from the epoch of their format with integers, also for float input
 # Parts of a microsecond are rounded down instead of to the nearest microsecond, so a timestamp is never later than
 # the actual time (50 ns before midnight stays on the same day) and matches the digits that other tools show
 # We don't use platform time functions, so this also works before 1970 on Windows and WASM (Emscripten), and
 # timestamps outside the range of datetime raise an OverflowError on every platform
-_SECOND = timedelta(seconds=1)
-_MILLISECOND = timedelta(milliseconds=1)
-_MICROSECOND = timedelta(microseconds=1)
+SECOND = timedelta(seconds=1)
+MILLISECOND = timedelta(milliseconds=1)
+MICROSECOND = timedelta(microseconds=1)
 
 
 def _floor_float(ts: float, numerator: int) -> int:
@@ -31,7 +31,7 @@ def _floor_float(ts: float, numerator: int) -> int:
 
 def now() -> datetime:
     """Return an aware datetime object of the current time in UTC."""
-    return datetime.now(_UTC)
+    return datetime.now(UTC)
 
 
 def unix_now() -> int:
@@ -122,8 +122,8 @@ def from_unix(ts: float) -> datetime:
         Datetime object from the passed timestamp.
     """
     if isinstance(ts, float):
-        return _EPOCH_UNIX + _MICROSECOND * _floor_float(ts, 1_000_000)
-    return _EPOCH_UNIX + _SECOND * ts
+        return EPOCH_UNIX + MICROSECOND * _floor_float(ts, 1_000_000)
+    return EPOCH_UNIX + SECOND * ts
 
 
 def from_unix_ms(ts: float) -> datetime:
@@ -136,8 +136,8 @@ def from_unix_ms(ts: float) -> datetime:
         Datetime object from the passed timestamp.
     """
     if isinstance(ts, float):
-        return _EPOCH_UNIX + _MICROSECOND * _floor_float(ts, 1000)
-    return _EPOCH_UNIX + _MILLISECOND * ts
+        return EPOCH_UNIX + MICROSECOND * _floor_float(ts, 1000)
+    return EPOCH_UNIX + MILLISECOND * ts
 
 
 def from_unix_us(ts: float) -> datetime:
@@ -150,8 +150,8 @@ def from_unix_us(ts: float) -> datetime:
         Datetime object from the passed timestamp.
     """
     if isinstance(ts, float):
-        return _EPOCH_UNIX + _MICROSECOND * _floor_float(ts, 1)
-    return _EPOCH_UNIX + _MICROSECOND * ts
+        return EPOCH_UNIX + MICROSECOND * _floor_float(ts, 1)
+    return EPOCH_UNIX + MICROSECOND * ts
 
 
 def from_unix_ns(ts: int) -> datetime:
@@ -163,7 +163,7 @@ def from_unix_ns(ts: int) -> datetime:
     Returns:
         Datetime object from the passed timestamp.
     """
-    return _EPOCH_UNIX + _MICROSECOND * (ts // 1000)
+    return EPOCH_UNIX + MICROSECOND * (ts // 1000)
 
 
 def xfstimestamp(seconds: int, nano: int) -> datetime:
@@ -175,7 +175,7 @@ def xfstimestamp(seconds: int, nano: int) -> datetime:
     Returns:
         Datetime object from the passed timestamp.
     """
-    return _EPOCH_UNIX + _MICROSECOND * (nano // 1000 + seconds * 1_000_000)
+    return EPOCH_UNIX + MICROSECOND * (nano // 1000 + seconds * 1_000_000)
 
 
 ufstimestamp = xfstimestamp
@@ -198,7 +198,7 @@ def wintimestamp(ts: int | tuple[int, int]) -> datetime:
             raise ValueError(f"Expected (dwLowDateTime, dwHighDateTime) tuple but got {ts!r}")
         ts = (ts[1] << 32) + ts[0]
 
-    return _EPOCH_WINDOWS + _MICROSECOND * (ts // 10)
+    return EPOCH_WINDOWS + MICROSECOND * (ts // 10)
 
 
 def oatimestamp(ts: float) -> datetime:
@@ -225,7 +225,7 @@ def oatimestamp(ts: float) -> datetime:
         fraction, days = math.modf(ts)
         ts = days - fraction
 
-    return _EPOCH_OA + _MICROSECOND * _floor_float(ts, 86_400_000_000)
+    return EPOCH_OA + MICROSECOND * _floor_float(ts, 86_400_000_000)
 
 
 def webkittimestamp(ts: int) -> datetime:
@@ -237,7 +237,7 @@ def webkittimestamp(ts: int) -> datetime:
     Returns:
         Datetime object from the passed timestamp.
     """
-    return _EPOCH_WINDOWS + _MICROSECOND * ts
+    return EPOCH_WINDOWS + MICROSECOND * ts
 
 
 def cocoatimestamp(ts: float) -> datetime:
@@ -250,8 +250,8 @@ def cocoatimestamp(ts: float) -> datetime:
         Datetime object from the passed timestamp.
     """
     if isinstance(ts, float):
-        return _EPOCH_COCOA + _MICROSECOND * _floor_float(ts, 1_000_000)
-    return _EPOCH_COCOA + _SECOND * ts
+        return EPOCH_COCOA + MICROSECOND * _floor_float(ts, 1_000_000)
+    return EPOCH_COCOA + SECOND * ts
 
 
 def uuid1timestamp(ts: int) -> datetime:
@@ -265,7 +265,7 @@ def uuid1timestamp(ts: int) -> datetime:
     Returns:
         Datetime object from the passed timestamp.
     """
-    return _EPOCH_UUID1 + _MICROSECOND * (ts // 10)
+    return EPOCH_UUID1 + MICROSECOND * (ts // 10)
 
 
 DOS_EPOCH_YEAR = 1980
@@ -363,7 +363,7 @@ def golangtimestamp(raw: bytes) -> datetime:
     if nanoseconds >= 1_000_000_000:
         raise ValueError(f"Expected nanoseconds below 1000000000 but got {nanoseconds}")
 
-    dt = _EPOCH_GO + _MICROSECOND * (seconds * 1_000_000 + nanoseconds // 1000)
+    dt = EPOCH_GO + MICROSECOND * (seconds * 1_000_000 + nanoseconds // 1000)
     if offset == -1:
         return dt
     return dt.astimezone(timezone(timedelta(minutes=offset, seconds=offset_seconds)))
