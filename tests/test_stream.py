@@ -71,6 +71,46 @@ def test_relative_stream() -> None:
     assert fh.read() == b"\x01" * 5 + b"\x02" * 10 + b"\x03" * 10
 
 
+@pytest.mark.parametrize("prefix", [1, 7, 16, 19, 64])
+@pytest.mark.parametrize("align", [1, 8, 16])
+def test_relative_stream_negative_offset(prefix: int, align: int) -> None:
+    data = bytes(range(32))
+    expected = b"\x00" * prefix + data
+    fh = stream.RelativeStream(io.BytesIO(data), -prefix, size=len(expected), align=align)
+
+    assert fh.read() == expected
+    assert fh.tell() == len(expected)
+    assert fh.read(1) == b""
+
+    for offset in [0, prefix - 1, prefix, prefix + 1, len(expected) - 1]:
+        fh.seek(offset)
+        assert fh.read(5) == expected[offset : offset + 5]
+        assert fh.tell() == min(offset + 5, len(expected))
+
+    fh.seek(-4, io.SEEK_END)
+    assert fh.read() == data[-4:]
+    fh.seek(0)
+    assert b"".join(iter(lambda: fh.read(3), b"")) == expected
+
+
+@pytest.mark.parametrize("align", [8, 16])
+def test_relative_stream_negative_offset_unknown_size(align: int) -> None:
+    data = bytes(range(32))
+    fh = stream.RelativeStream(io.BytesIO(data), -19, align=align)
+    assert fh.read() == b"\x00" * 19 + data
+    fh.seek(-4, io.SEEK_END)
+    assert fh.tell() == 47
+    assert fh.read(4) == data[-4:]
+
+
+def test_relative_stream_negative_offset_size_in_padding() -> None:
+    source = io.BytesIO(b"data")
+    fh = stream.RelativeStream(source, -16, size=3, align=8)
+    assert fh.read() == b"\x00" * 3
+    assert source.tell() == 0
+    assert fh.read(1) == b""
+
+
 def test_buffered_stream() -> None:
     buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512 + b"\x03" * 512)
     fh = stream.BufferedStream(buf, size=None)

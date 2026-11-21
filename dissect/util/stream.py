@@ -262,12 +262,27 @@ class RelativeStream(RangeStream):
     Args:
         fh: The source file-like object.
         offset: The offset the stream should start from on the source file-like object.
-        size: Optional size the stream should be.
+            a negative offset inserts a zero-filled prefix before the source data.
+        size: Optional size the stream should be, including any zero-filled prefix.
         align: The alignment size.
     """
 
     def __init__(self, fh: BinaryIO, offset: int, size: int | None = None, align: int = STREAM_BUFFER_SIZE):
         super().__init__(fh, offset, size, align)
+
+    def _read(self, offset: int, length: int) -> bytes:
+        source_offset = self.offset + offset
+        if source_offset >= 0:
+            return super()._read(offset, length)
+
+        read_length = min(length, self.size - offset) if self.size is not None and length >= 0 else length
+        padding = min(-source_offset, read_length) if read_length >= 0 else -source_offset
+        prefix = b"\x00" * padding
+        if read_length == padding:
+            return prefix
+
+        self._fh.seek(0)
+        return prefix + self._fh.read(read_length - padding if read_length >= 0 else -1)
 
 
 class BufferedStream(RelativeStream):
