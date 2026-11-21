@@ -54,7 +54,7 @@ dev = [
 ]
 
 [project.scripts]
-dump-nskeyedarchiver = "dissect.util.tools.dump_nskeyedarchiver:main"
+dissect-deserialize-plist = "dissect.util.tools.serialize.plist:main"
 
 [tool.ruff]
 line-length = 120
