@@ -134,6 +134,32 @@ def test_lz4_decompress_source_types(lz4: ModuleType, source_type: type) -> None
     assert hashlib.sha256(lz4.decompress(source_type(bytes.fromhex(data)))).hexdigest() == digest
 
 
+INPUT = b"the quick brown fox jumps over the lazy dog. " * 8
+COMPRESSED = (
+    "f01074686520717569636b2062726f776e20666f78206a756d7073206f766572201f00916c617a7920646f672e0e000f2d00ff2050"
+    "646f672e20"
+)
+
+
+def test_lz4_compress() -> None:
+    # Only the pure Python lz4 implements compress()
+    from dissect.util.compression import lz4_python
+
+    assert lz4_python.compress(INPUT) == bytes.fromhex(COMPRESSED)
+    assert lz4_python.decompress(lz4_python.compress(INPUT), len(INPUT)) == INPUT
+
+
+@pytest.mark.parametrize(
+    "data",
+    [b"", b"a", b"abcdefghijkl", b"\x00" * 70000, bytes(range(256)) * 300],
+    ids=["empty", "single", "short", "long-match", "far-offsets"],
+)
+def test_lz4_compress_roundtrip(lz4: ModuleType, data: bytes) -> None:
+    from dissect.util.compression import lz4_python
+
+    assert lz4.decompress(lz4_python.compress(data), len(data)) == data
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lz4_decompress(lz4: ModuleType, data: str, digest: str, benchmark: BenchmarkFixture) -> None:
@@ -146,3 +172,10 @@ def test_benchmark_lz4_decompress_dictionary(
     lz4: ModuleType, data: str, dictionary: bytes, expected: bytes, benchmark: BenchmarkFixture
 ) -> None:
     assert benchmark(lz4.decompress, bytes.fromhex(data), dictionary=dictionary) == expected
+
+
+@pytest.mark.benchmark
+def test_benchmark_lz4_compress(benchmark: BenchmarkFixture) -> None:
+    from dissect.util.compression import lz4_python
+
+    assert benchmark(lz4_python.compress, INPUT) == bytes.fromhex(COMPRESSED)
