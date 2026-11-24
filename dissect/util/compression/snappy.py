@@ -1,5 +1,11 @@
-# References:
-# - https://github.com/google/snappy/blob/main/format_description.txt
+"""Snappy decompression.
+
+This is the raw Snappy format, without the framing format.
+
+References:
+    - https://github.com/google/snappy/blob/main/format_description.txt
+"""
+
 from __future__ import annotations
 
 import io

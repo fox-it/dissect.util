@@ -1,3 +1,12 @@
+"""Sevenbit compression and decompression.
+
+Sevenbit stores each character in 7 bits instead of 8. ESE databases use it for ASCII text, and for UTF-16 text in
+which every character is ASCII.
+
+References:
+    - https://github.com/microsoft/Extensible-Storage-Engine/blob/main/dev/ese/src/ese/compression.cxx
+"""
+
 from __future__ import annotations
 
 from io import BytesIO

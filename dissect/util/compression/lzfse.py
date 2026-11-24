@@ -1,5 +1,12 @@
-# References:
-# - https://github.com/lzfse/lzfse
+"""LZFSE decompression.
+
+LZFSE is an Apple compression that combines LZ77 with finite state entropy coding. APFS can use it for compressed files.
+Blocks that are compressed with LZVN are decompressed with :mod:`dissect.util.compression.lzvn`.
+
+References:
+    - https://github.com/lzfse/lzfse
+"""
+
 from __future__ import annotations
 
 import io

@@ -1,3 +1,8 @@
+"""Compression algorithms.
+
+Most algorithms are only available in pure Python. A native Rust version is used when it's available.
+"""
+
 from __future__ import annotations
 
 from dissect.util.compression import lz4, lzo
@@ -21,8 +26,8 @@ lzo_python = lzo
 # dissect.util.compression.lzo_python.
 #
 # Note that the pure Python implementation and the Rust implementation are NOT a full replacement
-# for the "official" lz4 and lzo Python packages: only the decompress() function is implemented, plus
-# compress() in the pure Python lz4. Use dissect.util.compression.lz4_python to compress.
+# for the "official" lz4 and lzo Python packages: only the decompress() function is implemented, and compress()
+# for lz4.
 try:
     from dissect.util import _native
 
@@ -43,6 +48,7 @@ __all__ = [
     "lzo",
     "lzo_native",
     "lzo_python",
+    "lzop",
     "lzrc",
     "lzvn",
     "lzxpress",

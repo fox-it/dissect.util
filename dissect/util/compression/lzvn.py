@@ -1,5 +1,11 @@
-# References:
-# - https://github.com/lzfse/lzfse
+"""LZVN decompression.
+
+LZVN is an Apple LZ77-type compression. APFS can use it for compressed files, and LZFSE uses it for small inputs.
+
+References:
+    - https://github.com/lzfse/lzfse
+"""
+
 from __future__ import annotations
 
 import io

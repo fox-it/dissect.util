@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from typing import TYPE_CHECKING
 
 import pytest
@@ -137,38 +138,63 @@ def test_lznt1_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lznt1.decompress(bytes.fromhex(data)).rstrip(b"\x00")).hexdigest() == digest
 
 
-# LZNT1 of a 4096 byte A-Z pattern, from ntdll RtlCompressBuffer (COMPRESSION_FORMAT_LZNT1) on Windows 11 build 26100
-GOLD = (
-    "0fb1004243444546474849004a4b4c4d4e4f5051005253545556575859fc5a41ffcf5f80ff819f839f833f85ffdf86df867f881f8abf8bbf"
-    "8b5f8dff8eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0e"
-    "ff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e"
-    "9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f"
-    "0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0eff9f0e9f0e9f0e9f0e9f0e9f0e9f0e9f0e0f9f0e9f0e9f0e910e"
-)
-GOLD_DIGEST = "45508be868dafa697653cbc4cc934b0ce5266eb7e87a5a9ac8fc8005ecc03189"
+def test_lznt1_decompress_chunks() -> None:
+    """Test whether every chunk except the last decompresses to 4096 bytes, and where the data ends."""
+    # Two uncompressed chunks of 4 bytes, the first is padded with zeros
+    assert lznt1.decompress(bytes.fromhex("0330 61626364 0330 65666768")) == b"abcd" + bytes(4092) + b"efgh"
 
-INPUT = b"the quick brown fox jumps over the lazy dog. " * 8
-COMPRESSED = (
-    "33b0007468652071756963006b2062726f776e2000666f78206a756d708073206f7665722001f0006c617a7920646f67062e023434b1"
-)
-
-
-def test_lznt1_decompress_gold() -> None:
-    assert hashlib.sha256(lznt1.decompress(bytes.fromhex(GOLD))).hexdigest() == GOLD_DIGEST
-
-
-def test_lznt1_compress() -> None:
-    assert lznt1.compress(INPUT) == bytes.fromhex(COMPRESSED)
-    assert lznt1.decompress(lznt1.compress(INPUT)) == INPUT
+    # The data ends at a zero header, or at the end of the buffer if a header doesn't fit
+    assert lznt1.decompress(bytes.fromhex("0330 61626364 0000 ffff")) == b"abcd"
+    assert lznt1.decompress(bytes.fromhex("0330 61626364 ff")) == b"abcd"
 
 
 @pytest.mark.parametrize(
-    "data",
-    [b"", b"a", bytes(4096), bytes(range(256)) * 40, b"the quick brown fox" * 1000],
-    ids=["empty", "single", "zero-chunk", "incompressible-chunks", "multi-chunk"],
+    ("data", "message"),
+    [
+        pytest.param("0100 6162", "Invalid LZNT1 chunk signature", id="signature"),
+        pytest.param("0330 6162", "Truncated LZNT1 chunk", id="truncated"),
+        # Matches can't refer back into a previous chunk, so after a first chunk, the second chunk can't start with a
+        # match, and a match after a single literal can't have a distance of 2
+        pytest.param("0330 61626364 02b0 01 0000", "Invalid match distance", id="match_first"),
+        pytest.param("0330 61626364 03b0 02 78 0010", "Invalid match distance", id="match_distance"),
+        # A match of which only the first byte is in the chunk
+        pytest.param("02b0 02 78 00 10", "Invalid LZNT1 chunk", id="match_truncated"),
+        # A literal followed by a match of 4098 bytes, which decompresses to more than 4096 bytes
+        pytest.param("03b0 02 61 ff0f", "Invalid LZNT1 chunk", id="too_large"),
+    ],
 )
-def test_lznt1_compress_roundtrip(data: bytes) -> None:
+def test_lznt1_decompress_invalid(data: str, message: str) -> None:
+    """Test whether invalid chunks raise an error, instead of resulting in wrong data."""
+    with pytest.raises(ValueError, match=rf"^{message}$"):
+        lznt1.decompress(bytes.fromhex(data))
+
+
+COMPRESS_PARAMS = (
+    ("data",),
+    [
+        pytest.param(b"", id="empty"),
+        pytest.param(b"Kusjes, van SRT!\n", id="literal"),
+        pytest.param(bytes(range(256)) * 128, id="repeated"),
+        # Chunks that don't get smaller when compressed are stored uncompressed, including a partial last chunk
+        pytest.param(
+            b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(300)),
+            id="incompressible",
+        ),
+    ],
+)
+
+
+@pytest.mark.parametrize(*COMPRESS_PARAMS)
+def test_lznt1_compress(data: bytes) -> None:
+    """Test whether compressing and decompressing data results in the original data."""
     assert lznt1.decompress(lznt1.compress(data)) == data
+    assert lznt1.decompress(lznt1.compress(io.BytesIO(data))) == data
+
+
+def test_lznt1_compress_reduces_size() -> None:
+    """Test whether compressing data that has a lot of matches results in a smaller stream."""
+    data = bytes(range(256)) * 128
+    assert len(lznt1.compress(data)) < len(data)
 
 
 @pytest.mark.benchmark
@@ -179,4 +205,6 @@ def test_benchmark_lznt1_decompress(data: str, digest: str, benchmark: Benchmark
 
 @pytest.mark.benchmark
 def test_benchmark_lznt1_compress(benchmark: BenchmarkFixture) -> None:
-    assert benchmark(lznt1.compress, INPUT) == bytes.fromhex(COMPRESSED)
+    assert hashlib.sha256(benchmark(lznt1.compress, bytes(range(256)) * 128)).hexdigest() == (
+        "90446733542d95dc3c04438943185b49162d45cfb23dcb151380347bf874a029"
+    )

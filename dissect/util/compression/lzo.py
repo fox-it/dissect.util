@@ -1,7 +1,13 @@
-# References:
-# - https://github.com/FFmpeg/FFmpeg/blob/master/libavutil/lzo.c
-# - https://docs.kernel.org/staging/lzo.html
-# - https://github.com/torvalds/linux/blob/master/lib/lzo/lzo1x_decompress_safe.c
+"""LZO decompression.
+
+This is the LZO1X format.
+
+References:
+    - https://github.com/FFmpeg/FFmpeg/blob/master/libavutil/lzo.c
+    - https://docs.kernel.org/staging/lzo.html
+    - https://github.com/torvalds/linux/blob/master/lib/lzo/lzo1x_decompress_safe.c
+"""
+
 from __future__ import annotations
 
 import io

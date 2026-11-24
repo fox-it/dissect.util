@@ -37,7 +37,9 @@ fn decompress_to_unknown_size(src: &[u8], dictionary: &[u8]) -> Result<Vec<u8>, 
                 expected,
                 actual: _,
             }) => {
-                output_size = expected;
+                // The expected size only reaches the end of the sequence that didn't fit, so grow at least twofold
+                // to keep the number of attempts low, but not past the limit if the expected size fits within it
+                output_size = (output_size * 2).min(MAX_DISCOVER_OUTPUT_SIZE).max(expected);
             }
             Err(e) => {
                 return Err(PyErr::new::<PyValueError, _>(e.to_string()));
@@ -90,8 +92,25 @@ fn decompress(
     }
 }
 
+/// LZ4 compress bytes. Produces no header.
+///
+/// Unlike the Python implementation, this function does not support streaming compression
+/// (i.e. reading from a file-like object).
+///
+/// Args:
+///     src: Bytes to compress.
+///
+/// Returns:
+///     The compressed data.
+///
+#[pyfunction]
+fn compress(py: Python<'_>, src: Buffer) -> Py<PyAny> {
+    PyBytes::new(py, &lz4_flex::block::compress(&src)).into()
+}
+
 pub fn create_submodule(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let submodule = PyModule::new(m.py(), "lz4")?;
+    submodule.add_function(wrap_pyfunction!(compress, m)?)?;
     submodule.add_function(wrap_pyfunction!(decompress, m)?)?;
     m.add_submodule(&submodule)
 }

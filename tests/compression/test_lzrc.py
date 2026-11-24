@@ -126,7 +126,7 @@ COMPRESS_PARAMS = (
     ("data",),
     [
         pytest.param(b"", id="empty"),
-        pytest.param(b"Hello, Dissect!\n", id="literal"),
+        pytest.param(b"Kusjes, van SRT!\n", id="literal"),
         pytest.param(b"\x00" * 32768, id="zeros"),
         pytest.param(bytes(range(256)) * 128, id="repeated"),
         pytest.param(b"ABCD" * 3 + b"E" + b"ABCD" * 300, id="long_match"),
