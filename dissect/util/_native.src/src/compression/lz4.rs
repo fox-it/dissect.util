@@ -7,6 +7,22 @@ use crate::buffer::Buffer;
 
 const MAX_DISCOVER_OUTPUT_SIZE: usize = 1024 * 1024 * 1024;
 
+/// LZ4 compress bytes. Produces no header.
+///
+/// Unlike the Python implementation, this function does not support streaming compression
+/// (i.e. reading from a file-like object).
+///
+/// Args:
+///     src: Bytes to compress.
+///
+/// Returns:
+///     The compressed data.
+///
+#[pyfunction]
+fn compress(py: Python<'_>, src: Buffer) -> Py<PyAny> {
+    PyBytes::new(py, &lz4_flex::block::compress(&src)).into()
+}
+
 fn decompress_block(
     src: &[u8],
     output_size: usize,
@@ -39,7 +55,9 @@ fn decompress_to_unknown_size(src: &[u8], dictionary: &[u8]) -> Result<Vec<u8>, 
             }) => {
                 // The expected size only reaches the end of the sequence that didn't fit, so grow at least twofold
                 // to keep the number of attempts low, but not past the limit if the expected size fits within it
-                output_size = (output_size * 2).min(MAX_DISCOVER_OUTPUT_SIZE).max(expected);
+                output_size = (output_size * 2)
+                    .min(MAX_DISCOVER_OUTPUT_SIZE)
+                    .max(expected);
             }
             Err(e) => {
                 return Err(PyErr::new::<PyValueError, _>(e.to_string()));
@@ -90,22 +108,6 @@ fn decompress(
     } else {
         Ok(pyresult.into())
     }
-}
-
-/// LZ4 compress bytes. Produces no header.
-///
-/// Unlike the Python implementation, this function does not support streaming compression
-/// (i.e. reading from a file-like object).
-///
-/// Args:
-///     src: Bytes to compress.
-///
-/// Returns:
-///     The compressed data.
-///
-#[pyfunction]
-fn compress(py: Python<'_>, src: Buffer) -> Py<PyAny> {
-    PyBytes::new(py, &lz4_flex::block::compress(&src)).into()
 }
 
 pub fn create_submodule(m: &Bound<'_, PyModule>) -> PyResult<()> {
