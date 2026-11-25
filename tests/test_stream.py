@@ -10,6 +10,8 @@ import pytest
 from dissect.util import stream
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from pytest_benchmark.fixture import BenchmarkFixture
 
 
@@ -114,6 +116,58 @@ def test_mapping_stream_same_offset() -> None:
 
     assert fh._runs[0][2] == buffers[0]
     assert fh._runs[1][2] == buffers[1]
+
+
+def test_lookup_stream() -> None:
+    buf = io.BytesIO(b"\x01" * 512 + b"\x02" * 512)
+    lookup_calls: list[tuple[int, int]] = []
+
+    def lookup(offset: int, length: int) -> Iterator[tuple[int | None, int]]:
+        lookup_calls.append((offset, length))
+        if offset < 512:
+            size = min(512 - offset, length)
+            yield (0, size)
+            offset += size
+            length -= size
+        if length > 0:
+            yield (512, length)
+
+    fh = stream.LookupStream(buf, 1024, lookup=lookup, align=256)
+
+    assert fh.read(256) == b"\x01" * 256
+    assert lookup_calls == [(0, 256)]
+
+    assert fh.read(256) == b"\x01" * 256
+    assert lookup_calls == [(0, 256), (256, 256)]
+
+    fh.seek(512)
+    assert fh.read(256) == b"\x02" * 256
+    assert lookup_calls == [(0, 256), (256, 256), (512, 256)]
+
+    sparse = stream.LookupStream(io.BytesIO(b""), 16, lookup=lambda offset, length: iter([(None, length)]))
+    assert sparse.read() == b"\x00" * 16
+
+
+def test_lookup_stream_exhausted() -> None:
+    buf = io.BytesIO(b"\x01" * 16)
+
+    def partial(offset: int, length: int) -> Iterator[tuple[int | None, int]]:
+        # Only the first 8 bytes are mapped
+        if offset < 8:
+            yield (offset, min(8 - offset, length))
+
+    empty = stream.LookupStream(buf, 16, lookup=lambda offset, length: iter([]))
+    assert empty.read(16) == b""
+
+    truncated = stream.LookupStream(buf, 16, lookup=partial)
+    assert truncated.read(16) == b"\x01" * 8
+
+
+def test_lookup_stream_not_implemented() -> None:
+    fh = stream.LookupStream(io.BytesIO(b"\x01" * 16), 16)
+
+    with pytest.raises(NotImplementedError):
+        fh.read(16)
 
 
 def test_runlist_stream() -> None:
