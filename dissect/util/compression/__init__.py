@@ -1,6 +1,20 @@
 """Compression algorithms.
 
-Most algorithms are only available in pure Python. A native Rust version is used when it's available.
+All algorithms are implemented in pure Python. Some also have a faster native Rust version, which is used
+automatically when it's available. To get it, import the module from this package::
+
+    from dissect.util.compression import lz4
+
+    lz4.decompress(data)
+
+Importing from the module itself, e.g. ``from dissect.util.compression.lz4 import decompress``, always gives the
+pure Python version.
+
+To choose one explicitly, an algorithm with a native version also has ``<name>_native``, e.g. ``lz4_native``,
+which is ``None`` when the native version is unavailable, and ``<name>_python``, which is always available.
+
+Modules that share a name with a package on PyPI, such as ``lz4``, are not a replacement for that package. They only
+implement the functions they document.
 """
 
 from __future__ import annotations
