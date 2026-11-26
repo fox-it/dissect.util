@@ -24,24 +24,6 @@ from dissect.util.compression import lz4, lzo
 lz4_python = lz4
 lzo_python = lzo
 
-# This selects between a native Rust version of lz4 and lzo (when available) and our own
-# pure-Python implementation.
-#
-# By doing a:
-#  from dissect.util.compression import lz4
-# or
-#  from dissect.util.compression import lzo
-#
-# in another project will automatically give you one or the other.
-#
-# The native Rust version is also available as dissect.util.compression.lz4_native
-# and dissect.util.compression.lzo_native (when available) and the pure Python
-# version is always available as dissect.util.compression.lz4_python and
-# dissect.util.compression.lzo_python.
-#
-# Note that the pure Python implementation and the Rust implementation are NOT a full replacement
-# for the "official" lz4 and lzo Python packages: only the decompress() function is implemented, and compress()
-# for lz4.
 try:
     from dissect.util import _native
 
