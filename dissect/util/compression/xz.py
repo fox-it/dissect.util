@@ -1,3 +1,13 @@
+"""XZ checksum repair.
+
+Some XZ files have checksums that are corrupt on purpose, such as those of FortiOS. This module repairs the checksums,
+so that :mod:`lzma` can decompress the file.
+
+References:
+    - https://tukaani.org/xz/xz-file-format-1.1.0.txt
+    - https://github.com/Rogdham/python-xz
+"""
+
 from __future__ import annotations
 
 import io
@@ -15,10 +25,6 @@ def repair_checksum(fh: BinaryIO) -> BinaryIO:
 
     FortiOS XZ files have (on purpose) corrupt streams which they read using a modified ``xz`` binary.
     The only thing changed are the CRC32 checksums, so partially parse the XZ file and fix all of them.
-
-    References:
-        - https://tukaani.org/xz/xz-file-format-1.1.0.txt
-        - https://github.com/Rogdham/python-xz
 
     Args:
         fh: A file-like object of an LZMA stream to repair.

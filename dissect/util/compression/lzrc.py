@@ -1,5 +1,11 @@
-# References:
-# - https://github.com/hrydgard/ppsspp/blob/master/Core/FileSystems/tlzrc.cpp
+"""LZRC compression and decompression.
+
+LZRC combines LZ77 with range coding. Used in PBP files for the PlayStation Portable.
+
+References:
+    - https://github.com/hrydgard/ppsspp/blob/master/Core/FileSystems/tlzrc.cpp
+"""
+
 from __future__ import annotations
 
 import io

@@ -1,6 +1,12 @@
-# References:
-# - https://github.com/eafer/libzbitmap
-# - https://github.com/sgan81/apfs-fuse
+"""LZBITMAP decompression.
+
+LZBITMAP is an Apple compression that APFS can use for compressed files. It has no public specification.
+
+References:
+    - https://github.com/eafer/libzbitmap
+    - https://github.com/sgan81/apfs-fuse
+"""
+
 from __future__ import annotations
 
 import io

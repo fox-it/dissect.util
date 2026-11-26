@@ -1,5 +1,11 @@
-# References:
-# - https://github.com/Lekensteyn/dmg2img/blob/develop/adc.c
+"""ADC decompression.
+
+ADC (Apple Data Compression) is an LZ77-type compression that DMG disk images can use.
+
+References:
+    - https://github.com/Lekensteyn/dmg2img/blob/develop/adc.c
+"""
+
 from __future__ import annotations
 
 import io

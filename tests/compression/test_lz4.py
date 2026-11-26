@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from typing import TYPE_CHECKING
 
 import pytest
 
+from dissect.util.compression import lz4_python
 from dissect.util.exceptions import CorruptDataError
 
 if TYPE_CHECKING:
@@ -81,6 +83,11 @@ def test_lz4_decompress(lz4: ModuleType, data: str, digest: str) -> None:
     assert hashlib.sha256(lz4.decompress(bytes.fromhex(data), dictionary=b"")).hexdigest() == digest
 
 
+def test_lz4_decompress_last_sequence(lz4: ModuleType) -> None:
+    """Test whether the match length in the token of the last sequence is ignored, as the block format requires."""
+    assert lz4.decompress(bytes.fromhex("51") + b"abcde") == b"abcde"
+
+
 @pytest.mark.parametrize(*DICTIONARY_PARAMS)
 def test_lz4_decompress_dictionary(lz4: ModuleType, data: str, dictionary: bytes, expected: bytes) -> None:
     assert lz4.decompress(bytes.fromhex(data), dictionary=dictionary) == expected
@@ -134,6 +141,42 @@ def test_lz4_decompress_source_types(lz4: ModuleType, source_type: type) -> None
     assert hashlib.sha256(lz4.decompress(source_type(bytes.fromhex(data)))).hexdigest() == digest
 
 
+COMPRESS_PARAMS = (
+    ("data",),
+    [
+        pytest.param(b"", id="empty"),
+        # The last match has to start at least 12 bytes before the end, and the last 5 bytes are literals
+        pytest.param(b"A" * 12, id="no_match"),
+        pytest.param(b"A" * 13, id="last_match"),
+        pytest.param(b"\x00" * 70000, id="zeros"),
+        pytest.param(bytes(range(256)) * 128, id="repeated"),
+        # A match length of 274, of which the extension is a byte of 255 and a byte of 0
+        pytest.param(bytes(280), id="length_255"),
+        # The second ABCD is just out of reach of the first
+        pytest.param(b"ABCD" + bytes(65532) + b"ABCD" + bytes(12), id="far_match"),
+        pytest.param(
+            b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(128)),
+            id="incompressible",
+        ),
+    ],
+)
+
+
+@pytest.mark.parametrize(*COMPRESS_PARAMS)
+def test_lz4_compress(lz4: ModuleType, data: bytes) -> None:
+    """Test whether compressing and decompressing data results in the original data."""
+    assert lz4.decompress(lz4.compress(data), len(data)) == data
+
+    # Both implementations decompress the output of the pure Python implementation
+    assert lz4.decompress(lz4_python.compress(io.BytesIO(data)), len(data)) == data
+
+
+def test_lz4_compress_reduces_size(lz4: ModuleType) -> None:
+    """Test whether compressing data that has a lot of matches results in a smaller stream."""
+    data = bytes(range(256)) * 128
+    assert len(lz4.compress(data)) < len(data)
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lz4_decompress(lz4: ModuleType, data: str, digest: str, benchmark: BenchmarkFixture) -> None:
@@ -146,3 +189,10 @@ def test_benchmark_lz4_decompress_dictionary(
     lz4: ModuleType, data: str, dictionary: bytes, expected: bytes, benchmark: BenchmarkFixture
 ) -> None:
     assert benchmark(lz4.decompress, bytes.fromhex(data), dictionary=dictionary) == expected
+
+
+@pytest.mark.benchmark
+def test_benchmark_lz4_compress(benchmark: BenchmarkFixture) -> None:
+    assert hashlib.sha256(benchmark(lz4_python.compress, bytes(range(256)) * 128)).hexdigest() == (
+        "38d762a6d2f0d3f35307fe5ebc1e192d873f4b033fa3453d458499a9b01d0f06"
+    )

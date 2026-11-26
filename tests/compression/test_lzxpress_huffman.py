@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from typing import TYPE_CHECKING
 
 import pytest
@@ -142,6 +143,10 @@ PARAMS = (
 )
 
 
+# A Huffman table with two 1-bit codes: 0 for the literal "a" and 1 for a match at distance 1 with a length byte
+MATCH_TABLE = bytes(48) + b"\x10" + bytes(86) + b"\x10" + bytes(120)
+
+
 @pytest.mark.parametrize(*PARAMS)
 def test_lzxpress_huffman_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lzxpress_huffman.decompress(bytes.fromhex(data))).hexdigest() == digest
@@ -158,6 +163,53 @@ def test_lzxpress_huffman_decompress_invalid_distance() -> None:
         lzxpress_huffman.decompress(bytes(table) + bytes.fromhex("0080000000000000"))
 
 
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [
+        # A Huffman table with a single 1-bit code for the literal "a", which doesn't fill the whole code space
+        pytest.param(bytes(48) + b"\x10" + bytes(207) + bytes(4), "Invalid Huffman tree", id="single_code"),
+        # The literal and the match, of which the length word is 14, while it includes the 15 of the length byte
+        pytest.param(
+            MATCH_TABLE + bytes.fromhex("0040 0000 ff 0e00 0000 0000"),
+            "Invalid match length",
+            id="match_length",
+        ),
+        # The input ends in the length bytes of the match
+        pytest.param(
+            MATCH_TABLE + bytes.fromhex("0040 0000 ff 00"),
+            "Truncated LZXpress Huffman stream",
+            id="truncated_length",
+        ),
+    ],
+)
+def test_lzxpress_huffman_decompress_invalid(data: bytes, message: str) -> None:
+    """Test whether invalid input raises an error, instead of resulting in wrong data."""
+    with pytest.raises(ValueError, match=rf"^{message}$"):
+        lzxpress_huffman.decompress(data, 10)
+
+
+def test_lzxpress_huffman_decompress_truncated_end_of_stream() -> None:
+    """Test whether truncated input raises an error, instead of decoding the zero bits after it as end-of-stream."""
+    # A Huffman table with a 1-bit code 0 for the end-of-stream symbol and 2-bit codes 10 and 11 for "a" and "b"
+    table = bytearray(256)
+    table[48] = 0x20
+    table[49] = 0x02
+    table[128] = 0x01
+
+    # A single word with the code of "a", while the decoder always buffers two words
+    with pytest.raises(ValueError, match=r"^Truncated LZXpress Huffman stream$"):
+        lzxpress_huffman.decompress(bytes(table) + bytes.fromhex("0080"))
+
+
+def test_lzxpress_huffman_decompress_truncated_block() -> None:
+    """Test whether input that ends at the end of a block before the decompressed size is reached raises an error."""
+    # Exactly one full block, so the input ends where the next block would start
+    buf = bytes.fromhex(PARAMS[1][2].values[0])
+
+    with pytest.raises(ValueError, match=r"^Truncated LZXpress Huffman stream$"):
+        lzxpress_huffman.decompress(buf, len(lzxpress_huffman.decompress(buf)) + 1)
+
+
 @pytest.mark.parametrize(*PARAMS)
 def test_lzxpress_huffman_decompress_size(data: str, digest: str) -> None:
     buf = bytes.fromhex(data)
@@ -167,7 +219,57 @@ def test_lzxpress_huffman_decompress_size(data: str, digest: str) -> None:
     assert lzxpress_huffman.decompress(buf, 100) == result[:100]
 
 
+COMPRESS_PARAMS = (
+    ("data",),
+    [
+        pytest.param(b"", id="empty"),
+        pytest.param(b"Kusjes, van SRT!\n", id="literal"),
+        # A match of 3 bytes at distance 1 at the end, which has the same symbol as the end-of-stream symbol
+        pytest.param(b"ABBBB", id="end_of_stream_match"),
+        pytest.param(b"\x00" * 70000, id="zeros"),
+        pytest.param(bytes(range(256)) * 600, id="repeated"),
+        pytest.param(b"ABCD" * 30, id="medium_match"),
+        # A match length of 273, which doesn't fit in the length byte, because a byte of 255 means that a word follows
+        pytest.param(bytes(274), id="length_255"),
+        pytest.param(b"ABCD" * 3 + b"E" + b"ABCD" * 300, id="long_match"),
+        # The second ABCD is just out of reach of the first
+        pytest.param(b"ABCD" + bytes(65532) + b"ABCD", id="far_match"),
+        pytest.param(
+            b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(4096)),
+            id="incompressible",
+        ),
+    ],
+)
+
+
+@pytest.mark.parametrize(*COMPRESS_PARAMS)
+def test_lzxpress_huffman_compress(data: bytes) -> None:
+    """Test whether compressing and decompressing data results in the original data."""
+    assert lzxpress_huffman.decompress(lzxpress_huffman.compress(data), len(data)) == data
+    assert lzxpress_huffman.decompress(lzxpress_huffman.compress(io.BytesIO(data)), len(data)) == data
+    assert lzxpress_huffman.decompress(lzxpress_huffman.compress(data)) == data
+
+
+def test_lzxpress_huffman_compress_complete_tree() -> None:
+    """Test whether the Huffman table describes a complete tree when only one symbol is used, as Windows requires."""
+    table = lzxpress_huffman.compress(b"")[:256]
+    lengths = [length for byte in table for length in (byte & 0x0F, byte >> 4)]
+    assert sum(1 << (15 - length) for length in lengths if length) == 1 << 15
+
+
+def test_lzxpress_huffman_compress_example() -> None:
+    """Test whether compressing the example of [MS-XCA] section 3.2 results in the same data."""
+    assert lzxpress_huffman.compress(b"abc" * 100) == bytes.fromhex(PARAMS[1][0].values[0])
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzxpress_huffman_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lzxpress_huffman.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzxpress_huffman_compress(benchmark: BenchmarkFixture) -> None:
+    assert hashlib.sha256(benchmark(lzxpress_huffman.compress, bytes(range(256)) * 128)).hexdigest() == (
+        "95ea5c304f28661e74e0066beb04414a5cfd546b924805e8d680f7dce0078082"
+    )

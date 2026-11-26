@@ -1,3 +1,11 @@
+"""LZ4 compression and decompression.
+
+This is the LZ4 block format, without the frame format.
+
+References:
+    - https://github.com/lz4/lz4/blob/dev/doc/lz4_Block_format.md
+"""
+
 from __future__ import annotations
 
 import io
@@ -6,7 +14,14 @@ from typing import BinaryIO
 
 from dissect.util.exceptions import CorruptDataError
 
+_H = struct.Struct("<H")
+
 MAX_OFFSET = 0xFFFF
+MIN_MATCH = 4
+
+# The last match must start at least 12 bytes before the end of the block, and the last 5 bytes are always literals
+MF_LIMIT = 12
+LAST_LITERALS = 5
 
 
 def _get_length(src: BinaryIO, length: int) -> int:
@@ -24,6 +39,72 @@ def _get_length(src: BinaryIO, length: int) -> int:
             break
 
     return length
+
+
+def _put_length(dst: bytearray, length: int) -> None:
+    if length < 0xF:
+        return
+
+    length -= 0xF
+    while length >= 0xFF:
+        dst.append(0xFF)
+        length -= 0xFF
+    dst.append(length)
+
+
+def compress(src: bytes | BinaryIO) -> bytes:
+    """LZ4 compress from a file-like object or bytes. Produces no header.
+
+    Args:
+        src: File-like object or bytes to compress.
+
+    Returns:
+        The compressed data.
+    """
+    if not hasattr(src, "read"):
+        src = io.BytesIO(src)
+
+    data = src.read()
+    dst = bytearray()
+
+    # Only the last position of each 4 bytes is kept, and only for the start of a literal or match, which makes
+    # compressing fast at the cost of a larger output
+    positions = {}
+    literal_offset = 0
+    offset = 0
+
+    while offset <= len(data) - MF_LIMIT:
+        key = data[offset : offset + MIN_MATCH]
+        match_offset = positions.get(key)
+        positions[key] = offset
+
+        if match_offset is None or offset - match_offset > MAX_OFFSET:
+            # Literal, which is written together with the next match
+            offset += 1
+            continue
+
+        length = MIN_MATCH
+        while offset + length < len(data) - LAST_LITERALS and data[match_offset + length] == data[offset + length]:
+            length += 1
+
+        # Match, preceded by the literals since the previous match
+        literal_len = offset - literal_offset
+        dst.append((min(literal_len, 0xF) << 4) | min(length - MIN_MATCH, 0xF))
+        _put_length(dst, literal_len)
+        dst += data[literal_offset:offset]
+        dst += _H.pack(offset - match_offset)
+        _put_length(dst, length - MIN_MATCH)
+
+        offset += length
+        literal_offset = offset
+
+    # The block ends with only literals
+    literal_len = len(data) - literal_offset
+    dst.append(min(literal_len, 0xF) << 4)
+    _put_length(dst, literal_len)
+    dst += data[literal_offset:]
+
+    return bytes(dst)
 
 
 def decompress(
@@ -72,15 +153,13 @@ def decompress(
             break
 
         if len(read_buf := src.read(2)) == 0:
-            token_and = token & 0xF
-            if token_and != 0:
-                raise CorruptDataError(f"EOF, but match-len > 0: {token_and}")
+            # The last sequence only has literals, decoders ignore the match length in its token
             break
 
         if len(read_buf) != 2:
             raise CorruptDataError("Premature EOF")
 
-        if (offset := struct.unpack("<H", read_buf)[0]) == 0:
+        if (offset := _H.unpack(read_buf)[0]) == 0:
             raise CorruptDataError("Offset can't be 0")
 
         if offset > len(dst):

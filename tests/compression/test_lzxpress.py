@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from typing import TYPE_CHECKING
 
 import pytest
@@ -53,7 +54,79 @@ def test_lzxpress_decompress_invalid_distance() -> None:
         lzxpress.decompress(bytes.fromhex("000000800000"))
 
 
+@pytest.mark.parametrize(
+    "data",
+    [
+        # Three of the four bytes of the flags
+        pytest.param("000000", id="flags"),
+        # Flags that mark a literal, but the literal is missing
+        pytest.param("00000000", id="literal"),
+    ],
+)
+def test_lzxpress_decompress_truncated(data: str) -> None:
+    """Test whether input that ends halfway through an element raises an error."""
+    with pytest.raises(ValueError, match=r"^Truncated LZXpress stream$"):
+        lzxpress.decompress(bytes.fromhex(data))
+
+
+@pytest.mark.parametrize(*PARAMS)
+def test_lzxpress_decompress_size(data: str, digest: str) -> None:
+    """Test whether decompressing stops at the decompressed size, also halfway through a match."""
+    buf = bytes.fromhex(data)
+    result = lzxpress.decompress(buf)
+
+    assert hashlib.sha256(lzxpress.decompress(buf, len(result))).hexdigest() == digest
+    assert lzxpress.decompress(buf, 100) == result[:100]
+
+    # Data after the decompressed size isn't read, here it would be a match with an invalid distance
+    assert lzxpress.decompress(buf + b"\xff\xff", len(result)) == result
+
+
+COMPRESS_PARAMS = (
+    ("data",),
+    [
+        pytest.param(b"", id="empty"),
+        pytest.param(b"Kusjes, van SRT!\n", id="literal"),
+        pytest.param(b"\x00" * 70000, id="zeros"),
+        pytest.param(bytes(range(256)) * 128, id="repeated"),
+        # A match length of 280, which doesn't fit in the length byte, because a byte of 255 means that a word follows
+        pytest.param(bytes(281), id="length_255"),
+        pytest.param(b"ABCD" * 3 + b"E" + b"ABCD" * 300, id="long_match"),
+        # The second ABCD is just out of reach of the first
+        pytest.param(b"ABCD" + bytes(8189) + b"ABCD", id="far_match"),
+        # Matches that share the nibble of their length
+        pytest.param((b"A" * 30 + b"B") * 3, id="shared_nibble"),
+        pytest.param(
+            b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(128)),
+            id="incompressible",
+        ),
+    ],
+)
+
+
+@pytest.mark.parametrize(*COMPRESS_PARAMS)
+def test_lzxpress_compress(data: bytes) -> None:
+    """Test whether compressing and decompressing data results in the original data."""
+    assert lzxpress.decompress(lzxpress.compress(data)) == data
+    assert lzxpress.decompress(lzxpress.compress(io.BytesIO(data))) == data
+
+
+def test_lzxpress_compress_example() -> None:
+    """Test whether compressing the examples of [MS-XCA] section 3.1 results in the same data."""
+    assert lzxpress.compress(b"abcdefghijklmnopqrstuvwxyz") == bytes.fromhex(
+        "3f000000 6162636465666768696a6b6c6d6e6f707172737475767778797a"
+    )
+    assert lzxpress.compress(b"abc" * 100) == bytes.fromhex(PARAMS[1][0].values[0])
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzxpress_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lzxpress.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzxpress_compress(benchmark: BenchmarkFixture) -> None:
+    assert hashlib.sha256(benchmark(lzxpress.compress, bytes(range(256)) * 128)).hexdigest() == (
+        "82e54b6bb6cda404a432158acf8bce60c831defb876b101ff223aa300e050156"
+    )
