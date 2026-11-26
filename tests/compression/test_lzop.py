@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from typing import TYPE_CHECKING
 
 import pytest
@@ -55,7 +56,95 @@ def test_lzop_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lzop.decompress(bytes.fromhex(data))).hexdigest() == digest
 
 
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        # lzop -F, without checksums
+        pytest.param(
+            "894c5a4f000d0a1a0a104020a0094001050300000c000000006b061af5000000000029b502ef00000044000000290e4b75736a65"
+            "732c2076616e20535254210a200340000c736a65732c2076616e20535254210a11000000000000",
+            b"Kusjes, van SRT!\n" * 4,
+            id="none",
+        ),
+        # lzop -CC, with Adler-32 checksums of the data and of the compressed data
+        pytest.param(
+            "894c5a4f000d0a1a0a104020a0094001050300000f000000006b061af5000000000029df02f20000004400000029f24e1529f211"
+            "0a630e4b75736a65732c2076616e20535254210a200340000c736a65732c2076616e20535254210a11000000000000",
+            b"Kusjes, van SRT!\n" * 4,
+            id="adler32",
+        ),
+        # lzop --crc32 -CC, with CRC-32 checksums of the header, the data and the compressed data
+        pytest.param(
+            "894c5a4f000d0a1a0a104020a0100101050300130c000000006b061af50000000000fdd0a69e00000044000000290cb3030aea41"
+            "99020e4b75736a65732c2076616e20535254210a200340000c736a65732c2076616e20535254210a11000000000000",
+            b"Kusjes, van SRT!\n" * 4,
+            id="crc32",
+        ),
+        # lzop -CC of data that doesn't get smaller, a stored block has no checksum of compressed data
+        pytest.param(
+            "894c5a4f000d0a1a0a104020a0094001050300000f000000006b061af5000000000029df02f20000002000000020301811e05fec"
+            "eb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e900000000",
+            hashlib.sha256(b"0").digest(),
+            id="stored",
+        ),
+    ],
+)
+def test_lzop_decompress_checksums(data: str, expected: bytes) -> None:
+    """Test whether the checksums that the flags in the header enable are skipped."""
+    assert lzop.decompress(bytes.fromhex(data)) == expected
+
+
+COMPRESS_PARAMS = (
+    ("data",),
+    [
+        pytest.param(b"", id="empty"),
+        pytest.param(b"Kusjes, van SRT!\n", id="literal"),
+        pytest.param(bytes(range(256)) * 128, id="repeated"),
+        # Blocks are at most 256 KiB, the last block is smaller
+        pytest.param(bytes(range(256)) * 1100, id="blocks"),
+        # Blocks that don't get smaller when compressed are stored uncompressed
+        pytest.param(
+            b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(300)),
+            id="incompressible",
+        ),
+    ],
+)
+
+
+@pytest.mark.parametrize(*COMPRESS_PARAMS)
+def test_lzop_compress(data: bytes) -> None:
+    """Test whether compressing and decompressing data results in the original data."""
+    assert lzop.decompress(lzop.compress(data)) == data
+    assert lzop.decompress(lzop.compress(io.BytesIO(data))) == data
+
+
+def test_lzop_compress_header() -> None:
+    """Test whether the header is the one that lzop writes, for a file without a name or modification time."""
+    assert lzop.compress(b"") == bytes.fromhex(
+        "894c5a4f000d0a1a0a104020a00940010503000001000081a40000000000000000002aa7028900000000"
+    )
+
+
+def test_lzop_compress_stored() -> None:
+    """Test whether a block that doesn't get smaller is stored, lzop doesn't read compressed blocks larger than that."""
+    data = b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(300))
+    assert len(lzop.compress(data)) == len(lzop.compress(b"")) + 12 + len(data)
+
+
+def test_lzop_compress_reduces_size() -> None:
+    """Test whether compressing data that has a lot of matches results in a smaller stream."""
+    data = bytes(range(256)) * 128
+    assert len(lzop.compress(data)) < len(data)
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzop_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lzop.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzop_compress(benchmark: BenchmarkFixture) -> None:
+    # The blocks are compressed with the native LZO implementation if it's available, which compresses differently
+    data = bytes(range(256)) * 128
+    assert lzop.decompress(benchmark(lzop.compress, data)) == data

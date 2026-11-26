@@ -124,6 +124,10 @@ def compress(src: bytes | BinaryIO) -> bytes:
                     length = match_length
                     distance = offset - match_offset
 
+                    # A longer match isn't possible
+                    if offset + length == block_end:
+                        break
+
             # The symbol of a match of 3 bytes at distance 1 is also the end-of-stream symbol, so avoid it
             if length == 0 or (length == MIN_MATCH and distance == 1):
                 # Literal

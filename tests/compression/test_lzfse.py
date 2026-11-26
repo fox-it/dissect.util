@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from typing import TYPE_CHECKING
 
 import pytest
@@ -47,7 +48,71 @@ def test_lzfse_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lzfse.decompress(bytes.fromhex(data))).hexdigest() == digest
 
 
+@pytest.mark.parametrize(
+    "header",
+    [
+        # 20 literals and 10001 L, M, D values
+        pytest.param("62767832220000001400a00000112720", id="matches"),
+        # 40004 literals and 1 L, M, D value
+        pytest.param("6276783222000000449ca00000010020", id="literals"),
+    ],
+)
+def test_lzfse_decompress_block_limits(header: str) -> None:
+    """Test whether a block with more literals or L, M, D values than the reference decoder allows raises an error."""
+    # The rest of a block of the compressed data from 2 times b"Kusjes, van SRT!\n"
+    data = (
+        "9f81ee37bb0900609700000000000000000000008f0200000000f0280000003c3a00000000000000000000000000f0870000f01b0000"
+        "000000f04dfc060000f01b00000000000000c06f0000bfc16ff01b000000fc06c06f00f01b00bf01c037c16ff01b0000000000000000"
+        "0000000000000000000000000000000000000000000000000000000044042b473d693f320200000000000000002562767824"
+    )
+    assert lzfse.decompress(bytes.fromhex("62767832220000001400a00000010020" + data)) == b"Kusjes, van SRT!\n" * 2
+
+    with pytest.raises(ValueError, match=r"^Invalid LZFSE block header$"):
+        lzfse.decompress(bytes.fromhex(header + data))
+
+
+COMPRESS_PARAMS = (
+    ("data",),
+    [
+        pytest.param(b"", id="empty"),
+        pytest.param(b"Kusjes, van SRT!\n", id="literal"),
+        pytest.param(bytes(range(256)) * 128, id="repeated"),
+        pytest.param(b" ".join(b"%x" % (i * i % 1009) for i in range(5000)), id="text"),
+        # A block has at most 40000 literals, the matches in the next block refer back into it
+        pytest.param(b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(1300)) * 2, id="literals"),
+        # A block has at most 10000 L, M, D values
+        pytest.param(b"".join(b"%5d" % i for i in range(12000)), id="matches"),
+        # The second ABCD is just out of reach of the first
+        pytest.param(b"ABCD" + bytes(262136) + b"ABCD" + bytes(12), id="far_match"),
+        pytest.param(
+            b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(300)),
+            id="incompressible",
+        ),
+    ],
+)
+
+
+@pytest.mark.parametrize(*COMPRESS_PARAMS)
+def test_lzfse_compress(data: bytes) -> None:
+    """Test whether compressing and decompressing data results in the original data."""
+    assert lzfse.decompress(lzfse.compress(data)) == data
+    assert lzfse.decompress(lzfse.compress(io.BytesIO(data))) == data
+
+
+def test_lzfse_compress_reduces_size() -> None:
+    """Test whether compressing data that has a lot of matches results in a smaller stream."""
+    data = bytes(range(256)) * 128
+    assert len(lzfse.compress(data)) < len(data)
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzfse_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lzfse.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzfse_compress(benchmark: BenchmarkFixture) -> None:
+    assert hashlib.sha256(benchmark(lzfse.compress, bytes(range(256)) * 128)).hexdigest() == (
+        "3763461362290934eb8a30cdf79e3544853e03619a0463eef594f1066d0a777c"
+    )

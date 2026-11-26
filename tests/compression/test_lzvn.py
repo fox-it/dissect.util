@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from typing import TYPE_CHECKING
 
 import pytest
@@ -50,7 +51,59 @@ def test_lzvn_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(lzvn.decompress(bytes.fromhex(data))).hexdigest() == digest
 
 
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        pytest.param("0600000000000000", b"", id="empty"),
+        # A literal, a match of 3 bytes and a match of 2 bytes that reuses the distance
+        pytest.param("e161 0001 f2 0600000000000000", b"aaaaaa", id="match"),
+    ],
+)
+def test_lzvn_decompress_end_of_stream(data: str, expected: bytes) -> None:
+    """Test whether the end of stream opcode also ends the stream after an opcode without literals."""
+    assert lzvn.decompress(bytes.fromhex(data)) == expected
+
+
+COMPRESS_PARAMS = (
+    ("data",),
+    [
+        pytest.param(b"", id="empty"),
+        pytest.param(b"Kusjes, van SRT!\n", id="literal"),
+        pytest.param(bytes(range(256)) * 128, id="repeated"),
+        pytest.param(b" ".join(b"%x" % (i * i % 1009) for i in range(5000)), id="text"),
+        # A match between 1536 and 16384 bytes away has an encoding with room for a longer match
+        pytest.param(b"ZYXWVUTSRQPO" + bytes(range(256)) * 8 + b"ZYXWVUTSRQPO", id="medium_distance"),
+        # The second ABCD is just out of reach of the first
+        pytest.param(b"ABCD" + bytes(65532) + b"ABCD" + bytes(12), id="far_match"),
+        pytest.param(
+            b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(300)),
+            id="incompressible",
+        ),
+    ],
+)
+
+
+@pytest.mark.parametrize(*COMPRESS_PARAMS)
+def test_lzvn_compress(data: bytes) -> None:
+    """Test whether compressing and decompressing data results in the original data."""
+    assert lzvn.decompress(lzvn.compress(data)) == data
+    assert lzvn.decompress(lzvn.compress(io.BytesIO(data))) == data
+
+
+def test_lzvn_compress_reduces_size() -> None:
+    """Test whether compressing data that has a lot of matches results in a smaller stream."""
+    data = bytes(range(256)) * 128
+    assert len(lzvn.compress(data)) < len(data)
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzvn_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(lzvn.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzvn_compress(benchmark: BenchmarkFixture) -> None:
+    assert hashlib.sha256(benchmark(lzvn.compress, bytes(range(256)) * 128)).hexdigest() == (
+        "2f889a1e472c8319890f316ed922bb9bf1b8c9ba84764831d0edf22b218a280f"
+    )

@@ -1,4 +1,4 @@
-"""LZVN decompression.
+"""LZVN compression and decompression.
 
 LZVN is an Apple LZ77-type compression. APFS can use it for compressed files, and LZFSE uses it for small inputs.
 
@@ -10,7 +10,19 @@ from __future__ import annotations
 
 import io
 import struct
+from collections import defaultdict, deque
 from typing import BinaryIO
+
+MIN_MATCH = 3
+WINDOW = 65535
+CHAIN_LIMIT = 128
+
+# The longest literal and match of an opcode that has its own length byte
+MAX_LITERAL = 271
+MAX_MATCH = 271
+
+# The end of stream opcode, which is followed by 7 zero bytes
+END_OF_STREAM = b"\x06" + bytes(7)
 
 # fmt: off
 OP_SML_D = (
@@ -60,6 +72,108 @@ OP_UDEF = (
 # fmt: on
 
 _H = struct.Struct("<H")
+
+
+def _put_literal(dst: bytearray, literal: bytes) -> None:
+    for i in range(0, len(literal), MAX_LITERAL):
+        chunk = literal[i : i + MAX_LITERAL]
+        if len(chunk) < 16:
+            dst.append(0xE0 | len(chunk))
+        else:
+            dst += bytes((0xE0, len(chunk) - 16))
+        dst += chunk
+
+
+def compress(src: bytes | BinaryIO) -> bytes:
+    """LZVN compress from a file-like object or bytes.
+
+    Args:
+        src: File-like object or bytes to compress.
+
+    Returns:
+        The compressed data.
+    """
+    if not hasattr(src, "read"):
+        src = io.BytesIO(src)
+
+    data = src.read()
+    dst = bytearray()
+
+    chains = defaultdict(lambda: deque(maxlen=CHAIN_LIMIT))
+    literal_offset = 0
+    offset = 0
+    previous_distance = 0
+
+    while offset < len(data):
+        length = 0
+        distance = 0
+
+        for match_offset in reversed(chains.get(data[offset : offset + MIN_MATCH], ())):
+            if offset - match_offset > WINDOW:
+                break
+
+            match_length = MIN_MATCH
+            while (
+                offset + match_length < len(data) and data[match_offset + match_length] == data[offset + match_length]
+            ):
+                match_length += 1
+
+            if match_length > length:
+                length = match_length
+                distance = offset - match_offset
+
+        if length == 0:
+            # Literal, which is written together with the literals up to the next match
+            chains[data[offset : offset + MIN_MATCH]].append(offset)
+            offset += 1
+            continue
+
+        # Up to 3 literals are part of the match opcode, more get their own opcode
+        literal = data[literal_offset:offset]
+        if len(literal) > 3:
+            _put_literal(dst, literal)
+            literal = b""
+
+        # The match opcode has room for fewer match bytes the more literals it has, the rest of the match follows in
+        # match opcodes that reuse the distance
+        match_length = min(length, 10 - 2 * len(literal))
+        remaining = length - match_length
+
+        if distance == previous_distance:
+            if not literal:
+                dst.append(0xF0 | match_length)
+            else:
+                dst.append((len(literal) << 6) | ((match_length - 3) << 3) | 6)
+        elif distance < 0x600:
+            dst.append((len(literal) << 6) | ((match_length - 3) << 3) | (distance >> 8))
+            dst.append(distance & 0xFF)
+        elif distance >= 0x4000 or remaining == 0 or length > 34:
+            dst.append((len(literal) << 6) | ((match_length - 3) << 3) | 7)
+            dst += _H.pack(distance)
+        else:
+            # Medium distance, which has room for the whole match
+            remaining = 0
+            dst.append(0xA0 | (len(literal) << 3) | ((length - 3) >> 2))
+            dst += _H.pack((distance << 2) | ((length - 3) & 3))
+        dst += literal
+
+        for i in range(0, remaining, MAX_MATCH):
+            size = min(remaining - i, MAX_MATCH)
+            if size < 16:
+                dst.append(0xF0 | size)
+            else:
+                dst += bytes((0xF0, size - 16))
+
+        for i in range(offset, offset + length):
+            chains[data[i : i + MIN_MATCH]].append(i)
+        offset += length
+        literal_offset = offset
+        previous_distance = distance
+
+    _put_literal(dst, data[literal_offset:])
+    dst += END_OF_STREAM
+
+    return bytes(dst)
 
 
 def decompress(src: bytes | BinaryIO) -> bytes:
@@ -207,12 +321,6 @@ def decompress(src: bytes | BinaryIO) -> bytes:
                 break
 
         elif opc in OP_EOS:
-            opc_len = 8
-
-            if src_size < opc_len:
-                break
-
-            src_size -= opc_len + L
             break
 
         elif opc in OP_UDEF:

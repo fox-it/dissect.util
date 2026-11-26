@@ -4,6 +4,43 @@ use pyo3::types::PyBytes;
 
 use crate::buffer::Buffer;
 
+/// LZO compress bytes.
+///
+/// Arguments are largely compatible with python-lzo API.
+///
+/// Unlike the Python implementation, this function does not support streaming compression
+/// (i.e. reading from a file-like object).
+///
+/// Args:
+///     src: Bytes to compress.
+///     header: Whether to include the metadata header in the output.
+///
+/// Returns:
+///     The compressed data.
+///
+#[pyfunction]
+#[pyo3(signature = (src, header=true))]
+fn compress(py: Python<'_>, src: Buffer, header: bool) -> PyResult<Bound<'_, PyBytes>> {
+    let mut result = Vec::new();
+    if header {
+        // Compatibility with python-lzo, which stores the decompressed size big endian
+        result.push(0xf0);
+        result.extend_from_slice(&(src.len() as u32).to_be_bytes());
+    }
+
+    if src.is_empty() {
+        // lzokay-native returns nothing for empty input, instead of the end of stream marker
+        result.extend_from_slice(&[0x11, 0x00, 0x00]);
+    } else {
+        result.extend(
+            lzokay_native::compress(&src)
+                .map_err(|e| PyErr::new::<PyValueError, _>(e.to_string()))?,
+        );
+    }
+
+    Ok(PyBytes::new(py, &result))
+}
+
 /// LZO decompress from bytes. Assumes no header.
 ///
 /// Arguments are largely compatible with python-lzo API.
@@ -32,7 +69,7 @@ fn decompress(
         if src.len() < 8 || src[0] < 0xf0 || src[0] > 0xf1 {
             return Err(PyValueError::new_err("Invalid header value"));
         }
-        let len = u32::from_le_bytes([src[1], src[2], src[3], src[4]]) as usize;
+        let len = u32::from_be_bytes([src[1], src[2], src[3], src[4]]) as usize;
         (&src[5..], Some(len))
     } else {
         (&src[..], (buflen >= 0).then_some(buflen as usize))
@@ -45,6 +82,7 @@ fn decompress(
 
 pub fn create_submodule(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let submodule = PyModule::new(m.py(), "lzo")?;
+    submodule.add_function(wrap_pyfunction!(compress, m)?)?;
     submodule.add_function(wrap_pyfunction!(decompress, m)?)?;
     m.add_submodule(&submodule)
 }

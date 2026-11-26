@@ -209,6 +209,10 @@ def compress(src: bytes | BinaryIO) -> bytes:
                 length = match_length
                 distance = offset - match_offset
 
+                # A longer match isn't possible
+                if length == MAX_MATCH:
+                    break
+
         if length == 0:
             # Literal
             rc.encode_bit(bm_match[state], 0, 0)
