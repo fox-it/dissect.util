@@ -13,14 +13,16 @@ use crate::buffer::Buffer;
 ///
 /// Args:
 ///     src: Bytes to compress.
+///     level: Ignored, all levels give the same output.
 ///     header: Whether to include the metadata header in the output.
 ///
 /// Returns:
 ///     The compressed data.
 ///
 #[pyfunction]
-#[pyo3(signature = (src, header=true))]
-fn compress(py: Python<'_>, src: Buffer, header: bool) -> PyResult<Bound<'_, PyBytes>> {
+#[pyo3(signature = (src, level=1, header=true))]
+#[allow(unused_variables)]
+fn compress(py: Python<'_>, src: Buffer, level: i32, header: bool) -> PyResult<Bound<'_, PyBytes>> {
     let mut result = Vec::new();
     if header {
         // Compatibility with python-lzo, which stores the decompressed size big endian

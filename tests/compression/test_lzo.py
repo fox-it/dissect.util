@@ -271,7 +271,7 @@ COMPRESS_PARAMS = (
 def test_lzo_compress(lzo: ModuleType, data: bytes) -> None:
     """Test whether compressing and decompressing data results in the original data, with and without a header."""
     assert lzo.decompress(lzo.compress(data)) == data
-    assert lzo.decompress(lzo.compress(data, False), False, len(data)) == data
+    assert lzo.decompress(lzo.compress(data, 1, False), False, len(data)) == data
 
     # Both implementations decompress the output of the pure Python implementation
     assert lzo.decompress(lzo_python.compress(io.BytesIO(data))) == data

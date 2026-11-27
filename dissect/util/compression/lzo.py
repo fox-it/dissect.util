@@ -71,13 +71,14 @@ def _put_literal(dst: bytearray, literal: bytes, first: bool) -> None:
     dst += literal
 
 
-def compress(src: bytes | BinaryIO, header: bool = True) -> bytes:
+def compress(src: bytes | BinaryIO, level: int = 1, header: bool = True) -> bytes:
     """LZO compress from a file-like object or bytes.
 
     Arguments are largely compatible with python-lzo API.
 
     Args:
         src: File-like object or bytes to compress.
+        level: Ignored, all levels give the same output.
         header: Whether to include the metadata header in the output.
 
     Returns:

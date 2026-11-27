@@ -57,7 +57,7 @@ def compress(src: bytes | BinaryIO) -> bytes:
     result = [LZOP_MAGIC, header, _I.pack(zlib.adler32(header))]
 
     while block := src.read(BLOCK_SIZE):
-        buf = lzo.compress(block, False)
+        buf = lzo.compress(block, header=False)
         if len(buf) >= len(block):
             # Uncompressed block
             buf = block
@@ -106,9 +106,11 @@ def decompress(src: bytes | BinaryIO) -> bytes:
 
     result = []
     while True:
-        uncompressed_block_size = _I.unpack(src.read(4))[0]
+        if len(buf := src.read(4)) < 4:
+            # The stream ends without an end marker, all blocks have been read
+            break
 
-        if uncompressed_block_size == 0:
+        if (uncompressed_block_size := _I.unpack(buf)[0]) == 0:
             break
 
         compressed_block_size = _I.unpack(src.read(4))[0]

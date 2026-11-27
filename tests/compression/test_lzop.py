@@ -94,6 +94,12 @@ def test_lzop_decompress_checksums(data: str, expected: bytes) -> None:
     assert lzop.decompress(bytes.fromhex(data)) == expected
 
 
+def test_lzop_decompress_truncated_end_marker() -> None:
+    """Test whether a file that is cut off inside the end marker returns all data of the complete blocks."""
+    data = b"Kusjes, van SRT!\n" * 4
+    assert lzop.decompress(lzop.compress(data)[:-2]) == data
+
+
 COMPRESS_PARAMS = (
     ("data",),
     [
