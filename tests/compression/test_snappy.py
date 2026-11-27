@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from typing import TYPE_CHECKING
 
 import pytest
@@ -69,7 +70,60 @@ def test_snappy_decompress(data: str, digest: str) -> None:
     assert hashlib.sha256(snappy.decompress(bytes.fromhex(data))).hexdigest() == digest
 
 
+@pytest.mark.parametrize(
+    "data",
+    [
+        # Three literals followed by a copy of 2 bytes from 0 or 4 bytes back
+        pytest.param("05 08616263 060000", id="zero"),
+        pytest.param("05 08616263 060400", id="before_start"),
+    ],
+)
+def test_snappy_decompress_invalid_distance(data: str) -> None:
+    """Test whether a copy without a distance, or from before the start of the output, raises an error."""
+    with pytest.raises(ValueError, match=r"^Invalid match distance$"):
+        snappy.decompress(bytes.fromhex(data))
+
+
+COMPRESS_PARAMS = (
+    ("data",),
+    [
+        pytest.param(b"", id="empty"),
+        pytest.param(b"Kusjes, van SRT!\n", id="literal"),
+        pytest.param(bytes(range(256)) * 128, id="repeated"),
+        pytest.param(b" ".join(b"%x" % (i * i % 1009) for i in range(5000)), id="text"),
+        # A copy of 65 bytes is split in copies of 60 and 5 bytes, because a copy can't be shorter than 4 bytes
+        pytest.param(b"a" * 66, id="copy_split"),
+        # The second ABCD is just out of reach of the first
+        pytest.param(b"ABCD" + bytes(65532) + b"ABCD" + bytes(12), id="far_match"),
+        pytest.param(
+            b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(300)),
+            id="incompressible",
+        ),
+    ],
+)
+
+
+@pytest.mark.parametrize(*COMPRESS_PARAMS)
+def test_snappy_compress(data: bytes) -> None:
+    """Test whether compressing and decompressing data results in the original data."""
+    assert snappy.decompress(snappy.compress(data)) == data
+    assert snappy.decompress(snappy.compress(io.BytesIO(data))) == data
+
+
+def test_snappy_compress_reduces_size() -> None:
+    """Test whether compressing data that has a lot of matches results in a smaller stream."""
+    data = bytes(range(256)) * 128
+    assert len(snappy.compress(data)) < len(data)
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_snappy_decompress(data: str, digest: str, benchmark: BenchmarkFixture) -> None:
     assert hashlib.sha256(benchmark(snappy.decompress, bytes.fromhex(data))).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_snappy_compress(benchmark: BenchmarkFixture) -> None:
+    assert hashlib.sha256(benchmark(snappy.compress, bytes(range(256)) * 128)).hexdigest() == (
+        "5b29470bd9de9e84f5e3f5a2c7a60e8a4b37b5ab17c6ffae54b1124e94b2d277"
+    )

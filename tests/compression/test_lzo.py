@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from typing import TYPE_CHECKING
 
 import pytest
@@ -219,9 +220,84 @@ def test_lzo_decompress_invalid_distance() -> None:
         lzo_python.decompress(bytes.fromhex("12414001110000"), False, 10)
 
 
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        # One literal followed by a match of 2 bytes
+        pytest.param("12 41 0000 110000", b"AAA", id="match"),
+        # Two literals followed by a match of 2 bytes and the one literal in its state
+        pytest.param("13 4142 0100 43 110000", b"ABBBC", id="match_literal"),
+    ],
+)
+def test_lzo_decompress_first_literals(lzo: ModuleType, data: str, expected: bytes) -> None:
+    """Test whether up to 3 literals at the start of the stream can be followed by a match of 2 bytes."""
+    assert lzo.decompress(bytes.fromhex(data), False, len(expected)) == expected
+
+
+def test_lzo_decompress_end_of_stream(lzo: ModuleType) -> None:
+    """Test whether a stream of only the end of stream marker decompresses to nothing."""
+    assert lzo.decompress(bytes.fromhex("110000"), False, 0) == b""
+
+
+def test_lzo_decompress_header_size() -> None:
+    """Test whether decompressing stops at the decompressed size in the header, which python-lzo writes big endian."""
+    # Four literals and a match that repeats them, without an end of stream marker.
+    # Only the pure Python implementation, as lzokay-native requires the end of stream marker.
+    assert lzo_python.decompress(bytes.fromhex("f000000008 1574657374 6c00")) == b"testtest"
+
+
+COMPRESS_PARAMS = (
+    ("data",),
+    [
+        pytest.param(b"", id="empty"),
+        pytest.param(b"Kusjes, van SRT!\n", id="literal"),
+        pytest.param(bytes(range(256)) * 128, id="repeated"),
+        pytest.param(b" ".join(b"%x" % (i * i % 1009) for i in range(5000)), id="text"),
+        # The first byte only has room for the length of a first literal run of up to 238 bytes
+        pytest.param(bytes(range(239)) * 2, id="first_literal"),
+        # Matches more than 16 KiB away have their own encoding
+        pytest.param(b"".join(b"%d " % (i * i % 7919) for i in range(10000)), id="far_text"),
+        # The second ABCD is just out of reach of the first
+        pytest.param(b"ABCD" + bytes(49148) + b"ABCD" + bytes(12), id="far_match"),
+        pytest.param(
+            b"".join(hashlib.sha256(str(i).encode()).digest() for i in range(300)),
+            id="incompressible",
+        ),
+    ],
+)
+
+
+@pytest.mark.parametrize(*COMPRESS_PARAMS)
+def test_lzo_compress(lzo: ModuleType, data: bytes) -> None:
+    """Test whether compressing and decompressing data results in the original data, with and without a header."""
+    assert lzo.decompress(lzo.compress(data)) == data
+    assert lzo.decompress(lzo.compress(data, 1, False), False, len(data)) == data
+
+    # Both implementations decompress the output of the pure Python implementation
+    assert lzo.decompress(lzo_python.compress(io.BytesIO(data))) == data
+
+
+def test_lzo_compress_header(lzo: ModuleType) -> None:
+    """Test whether the header is the one that python-lzo writes, with the decompressed size big endian."""
+    assert lzo.compress(b"test") == bytes.fromhex("f0000000041574657374110000")
+
+
+def test_lzo_compress_reduces_size(lzo: ModuleType) -> None:
+    """Test whether compressing data that has a lot of matches results in a smaller stream."""
+    data = bytes(range(256)) * 128
+    assert len(lzo.compress(data)) < len(data)
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(*PARAMS)
 def test_benchmark_lzo_decompress(
     lzo: ModuleType, data: str, header: bool, buflen: int, digest: str, benchmark: BenchmarkFixture
 ) -> None:
     assert hashlib.sha256(benchmark(lzo.decompress, bytes.fromhex(data), header, buflen)).hexdigest() == digest
+
+
+@pytest.mark.benchmark
+def test_benchmark_lzo_compress(benchmark: BenchmarkFixture) -> None:
+    assert hashlib.sha256(benchmark(lzo_python.compress, bytes(range(256)) * 128)).hexdigest() == (
+        "26f8482aabecee878119abb5080b51c6bbe26305343230bd0a2a6375fd1d63f6"
+    )

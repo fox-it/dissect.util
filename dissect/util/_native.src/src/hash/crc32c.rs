@@ -51,7 +51,7 @@ const _TABLE: [u32; 256] = [
 fn update(py: Python<'_>, crc: u32, data: Buffer) -> PyResult<Py<PyAny>> {
     let mut crc = crc ^ 0xFFFFFFFF;
     for &b in data.iter() {
-        crc = _TABLE[((crc ^ b as u32) & 0xFF) as usize] ^ ((crc >> 8) & 0xFFFFFFFF);
+        crc = _TABLE[((crc ^ b as u32) & 0xFF) as usize] ^ (crc >> 8);
     }
     Ok((crc ^ 0xFFFFFFFF).into_pyobject(py)?.into())
 }

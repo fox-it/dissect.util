@@ -1,4 +1,4 @@
-"""LZFSE decompression.
+"""LZFSE compression and decompression.
 
 LZFSE is an Apple compression that combines LZ77 with finite state entropy coding. APFS can use it for compressed files.
 Blocks that are compressed with LZVN are decompressed with :mod:`dissect.util.compression.lzvn`.
@@ -9,8 +9,10 @@ References:
 
 from __future__ import annotations
 
+import bisect
 import io
 import struct
+from collections import defaultdict, deque
 from typing import BinaryIO, NamedTuple
 
 from dissect.util.compression import lzvn
@@ -36,6 +38,12 @@ LZFSE_ENCODE_D_STATES = 256
 LZFSE_ENCODE_LITERAL_STATES = 1024
 LZFSE_MATCHES_PER_BLOCK = 10000
 LZFSE_LITERALS_PER_BLOCK = 4 * LZFSE_MATCHES_PER_BLOCK
+LZFSE_ENCODE_MAX_L_VALUE = 315
+LZFSE_ENCODE_MAX_M_VALUE = 2359
+LZFSE_ENCODE_MAX_D_VALUE = 262139
+
+MIN_MATCH = 4
+CHAIN_LIMIT = 128
 
 # fmt: off
 _lzfse_freq_nbits_table = (
@@ -241,6 +249,15 @@ class DecoderEntry(NamedTuple):
     delta: int  # Signed increment used to compute next state (+bias)
 
 
+class EncoderEntry(NamedTuple):
+    """Entry for one symbol in the encoder table."""
+
+    s0: int  # First state requiring a K-bit shift
+    k: int  # States S >= S0 are shifted K bits, states S < S0 are shifted K-1 bits
+    delta0: int  # Relative increment used to compute next state if S >= S0
+    delta1: int  # Relative increment used to compute next state if S < S0
+
+
 class ValueDecoderEntry(NamedTuple):
     """Entry for one state in the value decoder table."""
 
@@ -335,6 +352,91 @@ class _BitStream:
         return result
 
 
+class _BitWriter:
+    def __init__(self):
+        self.dst = bytearray()
+        self.buffer = 0
+        self.bits = 0
+
+    def push(self, n: int, value: int) -> None:
+        self.buffer |= value << self.bits
+        self.bits += n
+
+        while self.bits >= 8:
+            self.dst.append(self.buffer & 0xFF)
+            self.buffer >>= 8
+            self.bits -= 8
+
+    def finish(self) -> int:
+        """Write the last bits padded with zeros, and return the negative number of padding bits."""
+        if not self.bits:
+            return 0
+
+        self.dst.append(self.buffer)
+        return self.bits - 8
+
+
+def _init_encoder_table(nstates: int, freq: list[int]) -> list[EncoderEntry | None]:
+    """Initialize encoder table ``T[nsymbols]``, with the same parameters as the decoder table.
+
+    Symbols with a 0 frequency don't have an entry, they should not be present in the data.
+    """
+    table = []
+    offset = 0
+
+    for f in freq:
+        if f == 0:
+            table.append(None)
+            continue
+
+        k = nstates.bit_length() - f.bit_length()  # shift needed to ensure N <= (F<<K) < 2*N
+        table.append(
+            EncoderEntry(
+                s0=(f << k) - nstates,
+                k=k,
+                delta0=offset - f + (nstates >> k),
+                delta1=offset - f + ((2 * nstates) >> k),
+            )
+        )
+        offset += f
+
+    return table
+
+
+def _normalize_freq(nstates: int, counts: list[int]) -> list[int]:
+    """Normalize the number of occurrences of each symbol to frequencies that add up to ``nstates``."""
+    # Every used symbol gets a state, the other states are divided by the number of occurrences, and the states that are
+    # left after rounding down go to the most frequent symbol. Without any occurrences that's the first symbol, like
+    # the reference encoder does.
+    used = len(counts) - counts.count(0)
+    total = sum(counts) or 1
+    freq = [1 + count * (nstates - used) // total if count else 0 for count in counts]
+    freq[counts.index(max(counts))] += nstates - sum(freq)
+    return freq
+
+
+def _encode_v1_freq_value(value: int) -> tuple[int, int]:
+    """Encode an entry value, return the number of bits and the bits."""
+    if value < 8:
+        b = _lzfse_freq_value_table.index(value)
+        return _lzfse_freq_nbits_table[b], b
+
+    if value < 24:
+        return 8, 7 + ((value - 8) << 4)
+
+    return 14, 15 + ((value - 24) << 4)
+
+
+def _encode(state: int, encoder_table: list[EncoderEntry | None], out_stream: _BitWriter, symbol: int) -> int:
+    """Encode symbol using the encoder table, and return the updated state."""
+    e = encoder_table[symbol]
+
+    # Write the lower K bits of the state, and update the state with the remaining bits and delta
+    k, delta = (e.k, e.delta0) if state >= e.s0 else (e.k - 1, e.delta1)
+    out_stream.push(k, state & ((1 << k) - 1))
+    return delta + (state >> k)
+
+
 def _decode(state: int, decoder_table: list[DecoderEntry], in_stream: _BitStream) -> tuple[int, int]:
     """Decode and return symbol using the decoder table, and update state."""
     e = decoder_table[state]
@@ -357,13 +459,14 @@ def _value_decode(state: int, decoder_table: list[ValueDecoderEntry], in_stream:
 
 
 def _decode_lmd(
+    dst: bytearray,
     header: LZFSECompressedBlockHeader,
     literals: list[int],
     l_decoder: list[ValueDecoderEntry],
     m_decoder: list[ValueDecoderEntry],
     d_decoder: list[ValueDecoderEntry],
     in_stream: _BitStream,
-) -> bytes:
+) -> None:
     symbols = header.n_matches
 
     l_state = header.l_state
@@ -376,8 +479,7 @@ def _decode_lmd(
     M = 0
     D = None
 
-    dst = bytearray()
-
+    # Matches can refer back into the output of earlier blocks
     while symbols:
         # Decode the next L, M, D symbol from the input stream
         l_state, L = _value_decode(l_state, l_decoder, in_stream)
@@ -402,6 +504,175 @@ def _decode_lmd(
             dst += chunk[: M % D]
 
         symbols -= 1
+
+
+def _put_sequence(sequences: list[tuple[int, int, int]], literal_length: int, match_length: int, distance: int) -> None:
+    # Literals that don't fit in one L value are split off into sequences without a match, with the most common D
+    while literal_length > LZFSE_ENCODE_MAX_L_VALUE:
+        sequences.append((LZFSE_ENCODE_MAX_L_VALUE, 0, 1))
+        literal_length -= LZFSE_ENCODE_MAX_L_VALUE
+    sequences.append((literal_length, match_length, distance))
+
+
+def compress(src: bytes | BinaryIO) -> bytes:
+    """LZFSE compress from a file-like object or bytes.
+
+    Produces compressed blocks with compressed frequency tables (v2).
+
+    Args:
+        src: File-like object or bytes to compress.
+
+    Returns:
+        The compressed data.
+    """
+    if not hasattr(src, "read"):
+        src = io.BytesIO(src)
+
+    data = src.read()
+    dst = bytearray()
+
+    # The L, M, D sequences of the whole input, a sequence without a match ends the input
+    sequences = []
+    chains = defaultdict(lambda: deque(maxlen=CHAIN_LIMIT))
+    literal_offset = 0
+    offset = 0
+
+    while offset < len(data):
+        length = 0
+        distance = 0
+
+        for match_offset in reversed(chains.get(data[offset : offset + MIN_MATCH], ())):
+            if offset - match_offset > LZFSE_ENCODE_MAX_D_VALUE:
+                break
+
+            match_length = MIN_MATCH
+            while (
+                match_length < LZFSE_ENCODE_MAX_M_VALUE
+                and offset + match_length < len(data)
+                and data[match_offset + match_length] == data[offset + match_length]
+            ):
+                match_length += 1
+
+            if match_length > length:
+                length = match_length
+                distance = offset - match_offset
+
+                # A longer match isn't possible
+                if length == LZFSE_ENCODE_MAX_M_VALUE:
+                    break
+
+        if length == 0:
+            # Literal, which is part of the sequence of the next match
+            chains[data[offset : offset + MIN_MATCH]].append(offset)
+            offset += 1
+            continue
+
+        _put_sequence(sequences, offset - literal_offset, length, distance)
+
+        for i in range(offset, offset + length):
+            chains[data[i : i + MIN_MATCH]].append(i)
+        offset += length
+        literal_offset = offset
+
+    if literal_offset < len(data):
+        _put_sequence(sequences, len(data) - literal_offset, 0, 1)
+
+    # Every block has a limited number of sequences and literals
+    blocks = []
+    n_literals = 0
+    for sequence in sequences:
+        if (
+            not blocks
+            or len(blocks[-1]) == LZFSE_MATCHES_PER_BLOCK
+            or n_literals + sequence[0] > LZFSE_LITERALS_PER_BLOCK
+        ):
+            blocks.append([])
+            n_literals = 0
+        blocks[-1].append(sequence)
+        n_literals += sequence[0]
+
+    offset = 0
+    for block in blocks:
+        literals = bytearray()
+        values = []
+        d_prev = 0
+        for L, M, D in block:
+            literals += data[offset : offset + L]
+            offset += L + M
+
+            # A D of 0 repeats the previous distance
+            values.append((L, M, 0 if d_prev == D else D))
+            d_prev = D
+
+        n_raw_bytes = sum(L + M for L, M, _ in values)
+
+        # The literals are encoded as 4 interleaved streams, so add 0x00 literals up to a multiple of 4
+        literals += bytes(-len(literals) % 4)
+
+        l_symbols = [bisect.bisect_right(_l_base_value, L) - 1 for L, _, _ in values]
+        m_symbols = [bisect.bisect_right(_m_base_value, M) - 1 for _, M, _ in values]
+        d_symbols = [bisect.bisect_right(_d_base_value, D) - 1 for _, _, D in values]
+
+        l_freq = _normalize_freq(LZFSE_ENCODE_L_STATES, [l_symbols.count(i) for i in range(LZFSE_ENCODE_L_SYMBOLS)])
+        m_freq = _normalize_freq(LZFSE_ENCODE_M_STATES, [m_symbols.count(i) for i in range(LZFSE_ENCODE_M_SYMBOLS)])
+        d_freq = _normalize_freq(LZFSE_ENCODE_D_STATES, [d_symbols.count(i) for i in range(LZFSE_ENCODE_D_SYMBOLS)])
+        literal_freq = _normalize_freq(
+            LZFSE_ENCODE_LITERAL_STATES, [literals.count(i) for i in range(LZFSE_ENCODE_LITERAL_SYMBOLS)]
+        )
+
+        freq_stream = _BitWriter()
+        for value in l_freq + m_freq + d_freq + literal_freq:
+            freq_stream.push(*_encode_v1_freq_value(value))
+        freq_stream.finish()
+
+        # Encode starting from the last literal and sequence, so that decoding starts from the first
+        literal_encoder = _init_encoder_table(LZFSE_ENCODE_LITERAL_STATES, literal_freq)
+        literal_stream = _BitWriter()
+        literal_state = [0, 0, 0, 0]
+        for i in range(len(literals) - 4, -1, -4):
+            for j in (3, 2, 1, 0):
+                literal_state[j] = _encode(literal_state[j], literal_encoder, literal_stream, literals[i + j])
+        literal_bits = literal_stream.finish()
+
+        l_encoder = _init_encoder_table(LZFSE_ENCODE_L_STATES, l_freq)
+        m_encoder = _init_encoder_table(LZFSE_ENCODE_M_STATES, m_freq)
+        d_encoder = _init_encoder_table(LZFSE_ENCODE_D_STATES, d_freq)
+        lmd_stream = _BitWriter()
+        l_state = m_state = d_state = 0
+        for i in reversed(range(len(values))):
+            # Every value is its symbol and the extra bits from the base value of that symbol
+            L, M, D = values[i]
+            lmd_stream.push(_d_extra_bits[d_symbols[i]], D - _d_base_value[d_symbols[i]])
+            d_state = _encode(d_state, d_encoder, lmd_stream, d_symbols[i])
+            lmd_stream.push(_m_extra_bits[m_symbols[i]], M - _m_base_value[m_symbols[i]])
+            m_state = _encode(m_state, m_encoder, lmd_stream, m_symbols[i])
+            lmd_stream.push(_l_extra_bits[l_symbols[i]], L - _l_base_value[l_symbols[i]])
+            l_state = _encode(l_state, l_encoder, lmd_stream, l_symbols[i])
+        lmd_bits = lmd_stream.finish()
+
+        # The L, M, D payload starts with 8 bytes of padding, for the reference decoder that reads 8 bytes at a time
+        lmd_payload = bytes(8) + lmd_stream.dst
+
+        dst += LZFSE_COMPRESSEDV2_BLOCK_MAGIC
+        dst += LZFSECompressedBlockHeader.__struct_v2__.pack(
+            n_raw_bytes,
+            len(literals) | (len(literal_stream.dst) << 20) | (len(values) << 40) | ((7 + literal_bits) << 60),
+            literal_state[0]
+            | (literal_state[1] << 10)
+            | (literal_state[2] << 20)
+            | (literal_state[3] << 30)
+            | (len(lmd_payload) << 40)
+            | ((7 + lmd_bits) << 60),
+            (4 + LZFSECompressedBlockHeader.__struct_v2__.size + len(freq_stream.dst))
+            | (l_state << 32)
+            | (m_state << 42)
+            | (d_state << 52),
+        )
+        dst += freq_stream.dst
+        dst += literal_stream.dst
+        dst += lmd_payload
+
+    dst += LZFSE_ENDOFSTREAM_BLOCK_MAGIC
 
     return bytes(dst)
 
@@ -441,6 +712,10 @@ def decompress(src: bytes | BinaryIO) -> bytes:
             else:
                 header = LZFSECompressedBlockHeader.parse_v2(src)
 
+            # Like the reference decoder, a block has room for a limited number of literals and L, M, D values
+            if header.n_literals > LZFSE_LITERALS_PER_BLOCK or header.n_matches > LZFSE_MATCHES_PER_BLOCK:
+                raise ValueError("Invalid LZFSE block header")
+
             literal_decoder = _init_decoder_table(LZFSE_ENCODE_LITERAL_STATES, header.literal_freq)
             l_decoder = _init_value_decoder_table(LZFSE_ENCODE_L_STATES, header.l_freq, _l_extra_bits, _l_base_value)
             m_decoder = _init_value_decoder_table(LZFSE_ENCODE_M_STATES, header.m_freq, _m_extra_bits, _m_base_value)
@@ -461,7 +736,7 @@ def decompress(src: bytes | BinaryIO) -> bytes:
                 literals.append(result)
 
             in_stream = _BitStream(src.read(header.n_lmd_payload_bytes), header.lmd_bits)
-            dst += _decode_lmd(header, literals, l_decoder, m_decoder, d_decoder, in_stream)
+            _decode_lmd(dst, header, literals, l_decoder, m_decoder, d_decoder, in_stream)
 
         elif magic == LZFSE_COMPRESSEDLZVN_BLOCK_MAGIC:
             (n_raw_bytes,) = _I.unpack(src.read(4))
